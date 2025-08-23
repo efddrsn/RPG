@@ -12,6 +12,8 @@ class DelphosVoiceSystem {
         this.isSpeaking = false;
         this.voiceMode = 'normal'; // 'normal' ou 'demonic'
         this.autoListen = false; // Para modo conversacional contínuo
+        this.voicesLoaded = false;
+        this.utteranceQueue = []; // Fila para garantir que utterances sejam processadas
         
         // Configurações de voz
         this.voices = {
@@ -41,6 +43,29 @@ class DelphosVoiceSystem {
         // Configurar Web Audio API para efeitos demoníacos
         this.audioContext = null;
         this.setupAudioEffects();
+        
+        // Forçar carregamento de vozes em alguns navegadores
+        this.initializeSpeechSynthesis();
+    }
+    
+    // Inicializar Speech Synthesis para garantir que funcione
+    initializeSpeechSynthesis() {
+        // Alguns navegadores precisam de uma interação inicial para carregar vozes
+        if (this.speechSynthesis) {
+            // Criar um utterance vazio para forçar inicialização
+            const initUtterance = new SpeechSynthesisUtterance('');
+            initUtterance.volume = 0;
+            this.speechSynthesis.speak(initUtterance);
+            this.speechSynthesis.cancel();
+            
+            // Adicionar listener para mudanças de voz
+            if (this.speechSynthesis.onvoiceschanged !== undefined) {
+                this.speechSynthesis.onvoiceschanged = () => {
+                    console.log('🔊 Evento voiceschanged disparado');
+                    this.loadVoices();
+                };
+            }
+        }
     }
     
     // Configurar reconhecimento de voz
@@ -90,11 +115,20 @@ class DelphosVoiceSystem {
         const setVoices = () => {
             const availableVoices = this.speechSynthesis.getVoices();
             
+            console.log(`🔊 Carregando vozes... Total disponível: ${availableVoices.length}`);
+            
+            if (availableVoices.length === 0) {
+                console.warn('⚠️ Nenhuma voz disponível ainda');
+                return;
+            }
+            
             // Procurar voz em português para modo normal
             this.voices.normal = availableVoices.find(voice => 
                 voice.lang.includes('pt-BR') && voice.name.includes('Google')
             ) || availableVoices.find(voice => 
                 voice.lang.includes('pt-BR')
+            ) || availableVoices.find(voice =>
+                voice.lang.includes('pt')
             ) || availableVoices[0];
             
             // Para voz demoníaca, preferir uma voz masculina grave
@@ -104,17 +138,27 @@ class DelphosVoiceSystem {
                  voice.name.toLowerCase().includes('masculino'))
             ) || this.voices.normal;
             
+            this.voicesLoaded = true;
+            
             console.log('🔊 Vozes carregadas:', {
                 normal: this.voices.normal?.name,
-                demonic: this.voices.demonic?.name
+                demonic: this.voices.demonic?.name,
+                total: availableVoices.length
             });
         };
         
         // Carregar vozes quando disponíveis
-        if (this.speechSynthesis.getVoices().length > 0) {
+        const voices = this.speechSynthesis.getVoices();
+        if (voices.length > 0) {
             setVoices();
         } else {
-            this.speechSynthesis.onvoiceschanged = setVoices;
+            // Tentar novamente após um pequeno delay
+            setTimeout(() => {
+                const voicesRetry = this.speechSynthesis.getVoices();
+                if (voicesRetry.length > 0) {
+                    setVoices();
+                }
+            }, 100);
         }
     }
     
@@ -233,72 +277,125 @@ class DelphosVoiceSystem {
     speak(text, isUnrestricted = false) {
         console.log(`🔊 speak chamado: "${text.substring(0, 50)}..." (modo ${isUnrestricted ? 'demoníaco' : 'normal'})`);
         
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             if (!this.speechSynthesis) {
                 console.error('❌ Síntese de voz não disponível');
-                alert('Síntese de voz não está disponível no seu navegador.');
-                resolve();
+                reject(new Error('Síntese de voz não está disponível no seu navegador.'));
                 return;
             }
             
             // Verificar se as vozes foram carregadas
-            if (!this.voices.normal) {
+            if (!this.voicesLoaded || !this.voices.normal) {
                 console.warn('⚠️ Vozes ainda não carregadas, tentando carregar...');
                 this.loadVoices();
+                
                 // Tentar novamente após um delay
-                setTimeout(() => this.speak(text, isUnrestricted).then(resolve), 500);
+                setTimeout(() => {
+                    this.speak(text, isUnrestricted)
+                        .then(resolve)
+                        .catch(reject);
+                }, 500);
                 return;
             }
             
-            // Parar qualquer fala anterior
+            // Cancelar qualquer fala anterior
             this.stopSpeaking();
             
-            const utterance = new SpeechSynthesisUtterance(text);
-            
-            // Configurar voz baseada no modo
-            if (isUnrestricted) {
-                utterance.voice = this.voices.demonic;
-                utterance.pitch = this.demonicEffects.pitch;
-                utterance.rate = this.demonicEffects.rate;
-                utterance.volume = this.demonicEffects.volume;
+            try {
+                const utterance = new SpeechSynthesisUtterance(text);
                 
-                // Adicionar efeitos extras se possível
-                this.applyDemonicEffects(utterance);
-            } else {
-                utterance.voice = this.voices.normal;
-                utterance.pitch = 1.0;
-                utterance.rate = 1.0;
-                utterance.volume = 1.0;
-            }
-            
-            utterance.lang = 'pt-BR';
-            
-            utterance.onstart = () => {
-                this.isSpeaking = true;
-                this.updateUI('speaking');
-                console.log('🔊 Falando' + (isUnrestricted ? ' (modo demoníaco)' : '') + '...');
-            };
-            
-            utterance.onend = () => {
-                this.isSpeaking = false;
-                this.updateUI('idle');
-                resolve();
-                
-                // Reiniciar escuta se em modo conversacional
-                if (this.autoListen) {
-                    setTimeout(() => this.startListening(), 500);
+                // Configurar voz baseada no modo
+                if (isUnrestricted && this.voices.demonic) {
+                    utterance.voice = this.voices.demonic;
+                    utterance.pitch = this.demonicEffects.pitch;
+                    utterance.rate = this.demonicEffects.rate;
+                    utterance.volume = this.demonicEffects.volume;
+                    
+                    // Adicionar efeitos extras se possível
+                    this.applyDemonicEffects(utterance);
+                } else if (this.voices.normal) {
+                    utterance.voice = this.voices.normal;
+                    utterance.pitch = 1.0;
+                    utterance.rate = 1.0;
+                    utterance.volume = 1.0;
                 }
-            };
-            
-            utterance.onerror = (event) => {
-                console.error('Erro na síntese:', event);
-                this.isSpeaking = false;
-                this.updateUI('error');
-                resolve();
-            };
-            
-            this.speechSynthesis.speak(utterance);
+                
+                utterance.lang = 'pt-BR';
+                
+                utterance.onstart = () => {
+                    this.isSpeaking = true;
+                    this.updateUI('speaking');
+                    console.log('🔊 Iniciando fala' + (isUnrestricted ? ' (modo demoníaco)' : '') + '...');
+                };
+                
+                utterance.onend = () => {
+                    this.isSpeaking = false;
+                    this.updateUI('idle');
+                    console.log('✅ Fala concluída');
+                    resolve();
+                    
+                    // Reiniciar escuta se em modo conversacional
+                    if (this.autoListen) {
+                        setTimeout(() => this.startListening(), 500);
+                    }
+                };
+                
+                utterance.onerror = (event) => {
+                    console.error('❌ Erro na síntese:', event.error, event);
+                    this.isSpeaking = false;
+                    this.updateUI('error', event.error);
+                    
+                    // Tentar novamente com configurações básicas se falhar
+                    if (event.error === 'synthesis-failed' || event.error === 'synthesis-unavailable') {
+                        console.log('🔄 Tentando com configurações básicas...');
+                        const basicUtterance = new SpeechSynthesisUtterance(text);
+                        basicUtterance.lang = 'pt-BR';
+                        
+                        basicUtterance.onend = () => {
+                            console.log('✅ Fala básica concluída');
+                            resolve();
+                        };
+                        
+                        basicUtterance.onerror = () => {
+                            reject(new Error('Falha na síntese de voz'));
+                        };
+                        
+                        this.speechSynthesis.speak(basicUtterance);
+                    } else {
+                        reject(new Error(`Erro na síntese: ${event.error}`));
+                    }
+                };
+                
+                // Adicionar à fila e processar
+                this.utteranceQueue.push(utterance);
+                this.processUtteranceQueue();
+                
+            } catch (error) {
+                console.error('❌ Erro ao criar utterance:', error);
+                reject(error);
+            }
         });
+    }
+    
+    // Processar fila de utterances
+    processUtteranceQueue() {
+        if (this.utteranceQueue.length === 0) return;
+        
+        const utterance = this.utteranceQueue.shift();
+        
+        // Garantir que o speechSynthesis esteja pronto
+        if (this.speechSynthesis.speaking || this.speechSynthesis.pending) {
+            this.speechSynthesis.cancel();
+        }
+        
+        // Pequeno delay para garantir que o sistema esteja pronto
+        setTimeout(() => {
+            try {
+                this.speechSynthesis.speak(utterance);
+            } catch (error) {
+                console.error('❌ Erro ao falar:', error);
+            }
+        }, 50);
     }
     
     // Aplicar efeitos demoníacos adicionais
@@ -322,8 +419,9 @@ class DelphosVoiceSystem {
     
     // Parar síntese
     stopSpeaking() {
-        if (this.isSpeaking) {
+        if (this.speechSynthesis) {
             this.speechSynthesis.cancel();
+            this.utteranceQueue = [];
             this.isSpeaking = false;
             this.updateUI('idle');
         }
