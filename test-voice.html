@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste do Sistema de Voz - Delphos AI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #333;
+            color: #fff;
+            border: 1px solid #666;
+            border-radius: 5px;
+        }
+        
+        button:hover {
+            background: #444;
+        }
+        
+        button:active {
+            background: #222;
+        }
+        
+        .log {
+            background: #000;
+            border: 1px solid #333;
+            padding: 20px;
+            margin-top: 20px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #666;
+        }
+        
+        .log-entry.info { border-color: #4CAF50; }
+        .log-entry.warn { border-color: #ff9800; }
+        .log-entry.error { border-color: #f44336; }
+        
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            background: #222;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teste do Sistema de Voz - Delphos AI</h1>
+    
+    <div class="status">
+        <p><strong>Status:</strong> <span id="status">Aguardando...</span></p>
+        <p><strong>Microfone:</strong> <span id="mic-status">Não testado</span></p>
+        <p><strong>Síntese de Voz:</strong> <span id="tts-status">Não testado</span></p>
+    </div>
+    
+    <div>
+        <h2>Testes de Funcionalidade</h2>
+        <button onclick="testMicrophone()">1. Testar Microfone</button>
+        <button onclick="testSpeechRecognition()">2. Testar Reconhecimento de Voz</button>
+        <button onclick="testTextToSpeech()">3. Testar Síntese de Voz Normal</button>
+        <button onclick="testDemonicVoice()">4. Testar Voz Demoníaca</button>
+        <button onclick="testFullSystem()">5. Teste Completo</button>
+    </div>
+    
+    <div class="log" id="log">
+        <div class="log-entry info">Console de testes iniciado...</div>
+    </div>
+    
+    <script src="voice-system.js"></script>
+    <script>
+        let voiceSystem = null;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+        
+        // Inicializar sistema
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Inicializando sistema de voz...');
+            try {
+                voiceSystem = new DelphosVoiceSystem();
+                log('Sistema de voz criado com sucesso', 'info');
+                updateStatus('Sistema inicializado');
+            } catch (error) {
+                log(`Erro ao criar sistema de voz: ${error.message}`, 'error');
+                updateStatus('Erro na inicialização');
+            }
+        });
+        
+        // 1. Testar Microfone
+        async function testMicrophone() {
+            log('Testando acesso ao microfone...');
+            updateStatus('Solicitando permissão do microfone...');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                log('✅ Microfone acessível', 'info');
+                document.getElementById('mic-status').textContent = '✅ Funcionando';
+                updateStatus('Microfone OK');
+                stream.getTracks().forEach(track => track.stop());
+            } catch (error) {
+                log(`❌ Erro ao acessar microfone: ${error.message}`, 'error');
+                document.getElementById('mic-status').textContent = '❌ Erro';
+                updateStatus('Erro no microfone');
+            }
+        }
+        
+        // 2. Testar Reconhecimento de Voz
+        function testSpeechRecognition() {
+            if (!voiceSystem) {
+                log('Sistema de voz não inicializado', 'error');
+                return;
+            }
+            
+            log('Testando reconhecimento de voz...');
+            updateStatus('Fale algo após o bipe...');
+            
+            // Sobrescrever temporariamente o handleVoiceInput
+            const originalHandler = voiceSystem.handleVoiceInput;
+            voiceSystem.handleVoiceInput = (transcript) => {
+                log(`✅ Texto reconhecido: "${transcript}"`, 'info');
+                updateStatus('Reconhecimento OK');
+                voiceSystem.handleVoiceInput = originalHandler;
+            };
+            
+            voiceSystem.startListening();
+        }
+        
+        // 3. Testar Síntese de Voz Normal
+        async function testTextToSpeech() {
+            if (!voiceSystem) {
+                log('Sistema de voz não inicializado', 'error');
+                return;
+            }
+            
+            log('Testando síntese de voz normal...');
+            updateStatus('Reproduzindo voz normal...');
+            
+            try {
+                await voiceSystem.speak('Olá, eu sou a Delphos AI. Este é um teste de voz normal.', false);
+                log('✅ Síntese de voz normal funcionando', 'info');
+                document.getElementById('tts-status').textContent = '✅ Funcionando';
+                updateStatus('Síntese OK');
+            } catch (error) {
+                log(`❌ Erro na síntese: ${error.message}`, 'error');
+                document.getElementById('tts-status').textContent = '❌ Erro';
+                updateStatus('Erro na síntese');
+            }
+        }
+        
+        // 4. Testar Voz Demoníaca
+        async function testDemonicVoice() {
+            if (!voiceSystem) {
+                log('Sistema de voz não inicializado', 'error');
+                return;
+            }
+            
+            log('Testando voz demoníaca...');
+            updateStatus('Reproduzindo voz demoníaca...');
+            
+            try {
+                await voiceSystem.speak('Os segredos das profundezas digitais serão revelados... Há há há...', true);
+                log('✅ Voz demoníaca funcionando', 'info');
+                updateStatus('Voz demoníaca OK');
+            } catch (error) {
+                log(`❌ Erro na voz demoníaca: ${error.message}', 'error');
+                updateStatus('Erro na voz demoníaca');
+            }
+        }
+        
+        // 5. Teste Completo
+        async function testFullSystem() {
+            log('=== INICIANDO TESTE COMPLETO ===', 'info');
+            
+            await testMicrophone();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testTextToSpeech();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testDemonicVoice();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            log('=== TESTE COMPLETO FINALIZADO ===', 'info');
+            updateStatus('Teste completo finalizado');
+        }
+    </script>
+</body>
+</html>
