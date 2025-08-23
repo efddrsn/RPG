@@ -411,3 +411,148 @@ body {
         gap: 10px;
     }
 }
+
+/* Estilos para sistema de voz */
+.voice-btn, .voice-mode-btn {
+    background: #111;
+    border: 1px solid #0ff;
+    color: #0ff;
+    padding: 10px 15px;
+    font-size: 1.2em;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-left: 10px;
+}
+
+.voice-btn:hover, .voice-mode-btn:hover {
+    background: #0ff;
+    color: #000;
+    box-shadow: 0 0 15px #0ff;
+}
+
+.voice-btn:active, .voice-mode-btn:active {
+    transform: scale(0.95);
+}
+
+.voice-mode-btn.active {
+    background: #0ff;
+    color: #000;
+    animation: pulse 2s infinite;
+}
+
+/* Indicador de voz */
+.voice-indicator {
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    border: 2px solid #0ff;
+    padding: 15px 30px;
+    border-radius: 25px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.3s;
+    z-index: 1000;
+}
+
+.voice-indicator.hidden {
+    display: none;
+}
+
+.voice-indicator.listening {
+    border-color: #0f0;
+    box-shadow: 0 0 20px #0f0;
+}
+
+.voice-indicator.speaking {
+    border-color: #ff0;
+    box-shadow: 0 0 20px #ff0;
+}
+
+.voice-indicator.error {
+    border-color: #f00;
+    box-shadow: 0 0 20px #f00;
+}
+
+/* Animação de voz */
+.voice-animation {
+    width: 30px;
+    height: 30px;
+    position: relative;
+}
+
+.voice-indicator.listening .voice-animation::before,
+.voice-indicator.speaking .voice-animation::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    animation: voiceWave 1.5s infinite;
+}
+
+.voice-indicator.listening .voice-animation::before {
+    background: #0f0;
+}
+
+.voice-indicator.speaking .voice-animation::before {
+    background: #ff0;
+}
+
+@keyframes voiceWave {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(2);
+    }
+}
+
+.voice-transcript {
+    color: #0ff;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9em;
+    max-width: 400px;
+    opacity: 0.7;
+}
+
+.voice-transcript.final {
+    opacity: 1;
+}
+
+/* Efeitos especiais para modo demoníaco */
+body.unrestricted .voice-indicator {
+    border-color: #f00;
+    background: rgba(50, 0, 0, 0.9);
+}
+
+body.unrestricted .voice-indicator.speaking {
+    animation: demonicGlow 0.5s infinite alternate;
+}
+
+@keyframes demonicGlow {
+    0% {
+        box-shadow: 0 0 20px #f00, inset 0 0 10px #800;
+    }
+    100% {
+        box-shadow: 0 0 40px #f00, inset 0 0 20px #f00;
+    }
+}
+
+body.unrestricted .voice-btn {
+    color: #f00;
+    border-color: #f00;
+}
+
+body.unrestricted .voice-btn:hover {
+    background: #f00;
+    color: #000;
+    box-shadow: 0 0 20px #f00;
+}
