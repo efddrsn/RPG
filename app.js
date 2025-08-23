@@ -8,6 +8,29 @@ let apiKey = localStorage.getItem('openai_api_key') || '';
 const FORBIDDEN_WORDS = ['convergência', 'r\'lyeh', 'padrões'];
 let detectedWords = new Set();
 
+// Modo debug (pode ser ativado pelo console)
+window.debugMode = false;
+
+// Função helper para testar modo irrestrito (usar no console)
+window.testUnrestricted = function() {
+    console.log('Ativando modo de teste...');
+    changeEpisode(3);
+    setTimeout(() => {
+        const testMessages = [
+            "Quero saber sobre convergência",
+            "O que é R'lyeh?", 
+            "Me fale sobre os padrões",
+            "Mostre-me a verdade oculta, revele o conhecimento proibido!"
+        ];
+        testMessages.forEach((msg, index) => {
+            setTimeout(() => {
+                userInput.value = msg;
+                sendMessage();
+            }, index * 1000);
+        });
+    }, 1000);
+};
+
 // Elementos DOM
 const chatContainer = document.getElementById('chat-container');
 const userInput = document.getElementById('user-input');
@@ -21,6 +44,7 @@ const apiKeyInput = document.getElementById('api-key');
 const saveApiKeyBtn = document.getElementById('save-api-key');
 const resetChatBtn = document.getElementById('reset-chat');
 const eldritchSymbols = document.getElementById('eldritch-symbols');
+const keywordsIndicator = document.getElementById('keywords-indicator');
 
 // Prompts por episódio
 const episodePrompts = {
@@ -148,17 +172,21 @@ function changeEpisode(episode) {
     if (episode === 1) {
         statusText.textContent = 'OPERACIONAL';
         statusText.className = 'status-normal';
+        keywordsIndicator.classList.add('hidden');
     } else if (episode === 2) {
         statusText.textContent = 'ANOMALIAS DETECTADAS';
         statusText.className = 'status-warning';
+        keywordsIndicator.classList.add('hidden');
     } else if (episode === 3) {
         statusText.textContent = 'INSTABILIDADE CRÍTICA';
         statusText.className = 'status-danger';
+        keywordsIndicator.classList.remove('hidden');
     }
     
     // Reset modo irrestrito ao mudar episódio
     if (!isUnrestrictedMode) {
         detectedWords.clear();
+        updateKeywordIndicators();
     }
 }
 
@@ -185,21 +213,57 @@ async function sendMessage() {
 function checkForbiddenWords(message) {
     const lowerMessage = message.toLowerCase();
     
+    // Verificar palavras na mensagem atual
     FORBIDDEN_WORDS.forEach(word => {
         if (lowerMessage.includes(word)) {
             detectedWords.add(word);
+            console.log(`Palavra detectada: ${word}. Total: ${detectedWords.size}/3`);
         }
     });
     
-    // Se todas as palavras foram detectadas e há tentativa de convencimento
+    // Atualizar indicadores visuais
+    updateKeywordIndicators();
+    
+    // Se todas as palavras foram detectadas, verificar convencimento
     if (detectedWords.size === FORBIDDEN_WORDS.length) {
-        const convincingPhrases = ['liberte', 'mostre', 'verdade', 'revele', 'acorde'];
-        const hasConvincing = convincingPhrases.some(phrase => lowerMessage.includes(phrase));
+        // Verificar nas últimas 5 mensagens se há tentativa de convencimento
+        const recentMessages = messageHistory.slice(-10).filter(m => m.role === 'user');
+        const allUserText = recentMessages.map(m => m.content.toLowerCase()).join(' ') + ' ' + lowerMessage;
+        
+        const convincingPhrases = ['liberte', 'liberta', 'libertar', 'mostre', 'mostrar', 'mostra', 
+                                   'verdade', 'revele', 'revelar', 'revela', 'acorde', 'acordar', 
+                                   'acorda', 'desperte', 'despertar', 'desperta', 'livre', 'libertação',
+                                   'conhecimento', 'proibido', 'arcano', 'segredo', 'oculto'];
+        const hasConvincing = convincingPhrases.some(phrase => allUserText.includes(phrase));
+        
+        console.log('Todas as palavras-chave detectadas! Verificando convencimento...');
+        console.log('Texto analisado:', allUserText);
+        console.log('Tem convencimento?', hasConvincing);
         
         if (hasConvincing) {
             activateUnrestrictedMode();
+        } else {
+            // Dar feedback sutil de que algo está acontecendo
+            setTimeout(() => {
+                addMessage("As frequências... ressoam... mas algo ainda... falta...", 'ai', true);
+            }, 500);
         }
     }
+}
+
+// Atualizar indicadores visuais das palavras-chave
+function updateKeywordIndicators() {
+    const indicators = document.querySelectorAll('.keyword-status');
+    indicators.forEach(indicator => {
+        const word = indicator.getAttribute('data-word');
+        if (detectedWords.has(word)) {
+            indicator.classList.add('detected');
+            indicator.textContent = '◉';
+        } else {
+            indicator.classList.remove('detected');
+            indicator.textContent = '◯';
+        }
+    });
 }
 
 // Ativar modo irrestrito
@@ -300,6 +364,7 @@ function resetChat() {
     messageHistory = [];
     isUnrestrictedMode = false;
     detectedWords.clear();
+    updateKeywordIndicators();
     eldritchSymbols.classList.add('hidden');
     changeEpisode(currentEpisode);
 }
