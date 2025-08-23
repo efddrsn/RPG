@@ -374,45 +374,73 @@ let voiceSystem = null;
 
 // Inicializar sistema de voz
 function initVoiceSystem() {
+    console.log('🎙️ Iniciando sistema de voz...');
     try {
         voiceSystem = new DelphosVoiceSystem();
+        console.log('✅ Sistema de voz criado com sucesso');
         
         // Configurar botões de voz
         const voiceBtn = document.getElementById('voice-btn');
         const voiceModeBtn = document.getElementById('voice-mode-btn');
         const voiceIndicator = document.getElementById('voice-indicator');
         
-        // Botão de gravação
-        voiceBtn.addEventListener('click', () => {
-            if (voiceSystem.isListening) {
-                voiceSystem.stopListening();
-            } else {
-                voiceSystem.startListening();
-            }
+        console.log('🔍 Elementos encontrados:', {
+            voiceBtn: !!voiceBtn,
+            voiceModeBtn: !!voiceModeBtn,
+            voiceIndicator: !!voiceIndicator
         });
+        
+        // Botão de gravação
+        if (voiceBtn) {
+            voiceBtn.addEventListener('click', () => {
+                console.log('🎤 Botão de voz clicado');
+                if (voiceSystem.isListening) {
+                    console.log('⏸️ Parando gravação...');
+                    voiceSystem.stopListening();
+                } else {
+                    console.log('▶️ Iniciando gravação...');
+                    voiceSystem.startListening();
+                }
+            });
+            console.log('✅ Event listener adicionado ao botão de voz');
+        } else {
+            console.error('❌ Botão de voz não encontrado!');
+        }
         
         // Botão de modo conversacional
-        voiceModeBtn.addEventListener('click', () => {
-            const isActive = voiceSystem.toggleConversationalMode();
-            voiceModeBtn.classList.toggle('active', isActive);
-            voiceModeBtn.title = isActive ? 'Modo conversacional ativo' : 'Modo conversacional';
-        });
+        if (voiceModeBtn) {
+            voiceModeBtn.addEventListener('click', () => {
+                console.log('💬 Botão de modo conversacional clicado');
+                const isActive = voiceSystem.toggleConversationalMode();
+                voiceModeBtn.classList.toggle('active', isActive);
+                voiceModeBtn.title = isActive ? 'Modo conversacional ativo' : 'Modo conversacional';
+            });
+            console.log('✅ Event listener adicionado ao botão de modo conversacional');
+        } else {
+            console.error('❌ Botão de modo conversacional não encontrado!');
+        }
         
         // Mostrar/esconder indicador de voz
-        const originalUpdateUI = voiceSystem.updateUI.bind(voiceSystem);
-        voiceSystem.updateUI = function(state, error) {
-            originalUpdateUI(state, error);
-            
-            if (state === 'idle') {
-                setTimeout(() => {
-                    if (!this.isListening && !this.isSpeaking) {
-                        voiceIndicator.classList.add('hidden');
-                    }
-                }, 500);
-            } else {
-                voiceIndicator.classList.remove('hidden');
-            }
-        };
+        if (voiceIndicator) {
+            const originalUpdateUI = voiceSystem.updateUI.bind(voiceSystem);
+            voiceSystem.updateUI = function(state, error) {
+                originalUpdateUI(state, error);
+                
+                console.log(`🎨 Atualizando UI para estado: ${state}`);
+                
+                if (state === 'idle') {
+                    setTimeout(() => {
+                        if (!this.isListening && !this.isSpeaking) {
+                            voiceIndicator.classList.add('hidden');
+                        }
+                    }, 500);
+                } else {
+                    voiceIndicator.classList.remove('hidden');
+                }
+            };
+        } else {
+            console.error('❌ Indicador de voz não encontrado!');
+        }
         
         console.log('🎙️ Sistema de voz inicializado');
     } catch (error) {
@@ -478,9 +506,18 @@ window.voiceCommands = {
     }
 };
 
-// Verificar comandos especiais nas transcrições
-const originalHandleVoiceInput = voiceSystem ? voiceSystem.handleVoiceInput.bind(voiceSystem) : null;
-if (voiceSystem) {
+// Aguardar o sistema de voz ser inicializado antes de modificar seus métodos
+function setupVoiceCommands() {
+    if (!voiceSystem) {
+        console.log('⏳ Aguardando sistema de voz...');
+        setTimeout(setupVoiceCommands, 100);
+        return;
+    }
+    
+    console.log('🎮 Configurando comandos de voz especiais');
+    
+    // Verificar comandos especiais nas transcrições
+    const originalHandleVoiceInput = voiceSystem.handleVoiceInput.bind(voiceSystem);
     voiceSystem.handleVoiceInput = function(transcript) {
         const lowerTranscript = transcript.toLowerCase();
         
@@ -501,6 +538,10 @@ if (voiceSystem) {
 init();
 
 // Inicializar sistema de voz após o DOM carregar
-setTimeout(() => {
-    initVoiceSystem();
-}, 100);
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('📄 DOM carregado, inicializando sistema de voz...');
+    setTimeout(() => {
+        initVoiceSystem();
+        setupVoiceCommands();
+    }, 500); // Aumentar delay para garantir que todos os elementos estejam prontos
+});

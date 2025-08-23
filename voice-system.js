@@ -175,23 +175,51 @@ class DelphosVoiceSystem {
     
     // Iniciar reconhecimento de voz
     startListening() {
+        console.log('🎤 startListening chamado');
+        
         if (!this.speechRecognition) {
-            alert('Seu navegador não suporta reconhecimento de voz!');
+            const msg = 'Seu navegador não suporta reconhecimento de voz! Use Chrome, Edge ou Safari.';
+            console.error('❌', msg);
+            alert(msg);
             return;
         }
         
-        if (this.isListening) return;
+        if (this.isListening) {
+            console.log('⚠️ Já está ouvindo');
+            return;
+        }
         
         // Parar síntese se estiver falando
         if (this.isSpeaking) {
             this.stopSpeaking();
         }
         
-        try {
-            this.recognition.start();
-        } catch (error) {
-            console.error('Erro ao iniciar reconhecimento:', error);
-        }
+        // Solicitar permissão do microfone se necessário
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(() => {
+                console.log('✅ Permissão de microfone concedida');
+                try {
+                    this.recognition.start();
+                    console.log('✅ Reconhecimento iniciado');
+                } catch (error) {
+                    console.error('❌ Erro ao iniciar reconhecimento:', error);
+                    if (error.message.includes('already started')) {
+                        // Tentar parar e reiniciar
+                        this.recognition.stop();
+                        setTimeout(() => {
+                            try {
+                                this.recognition.start();
+                            } catch (e) {
+                                console.error('❌ Erro ao reiniciar:', e);
+                            }
+                        }, 100);
+                    }
+                }
+            })
+            .catch((error) => {
+                console.error('❌ Erro ao obter permissão do microfone:', error);
+                alert('Por favor, permita o acesso ao microfone para usar o reconhecimento de voz.');
+            });
     }
     
     // Parar reconhecimento
@@ -203,10 +231,22 @@ class DelphosVoiceSystem {
     
     // Sintetizar fala
     speak(text, isUnrestricted = false) {
+        console.log(`🔊 speak chamado: "${text.substring(0, 50)}..." (modo ${isUnrestricted ? 'demoníaco' : 'normal'})`);
+        
         return new Promise((resolve) => {
             if (!this.speechSynthesis) {
-                console.error('Síntese de voz não disponível');
+                console.error('❌ Síntese de voz não disponível');
+                alert('Síntese de voz não está disponível no seu navegador.');
                 resolve();
+                return;
+            }
+            
+            // Verificar se as vozes foram carregadas
+            if (!this.voices.normal) {
+                console.warn('⚠️ Vozes ainda não carregadas, tentando carregar...');
+                this.loadVoices();
+                // Tentar novamente após um delay
+                setTimeout(() => this.speak(text, isUnrestricted).then(resolve), 500);
                 return;
             }
             
