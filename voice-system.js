@@ -1,5 +1,6 @@
 // Sistema de Voz para Delphos AI
 // Suporta speech-to-text e text-to-speech com vozes diferentes para modo normal e irrestrito
+// Agora com suporte para Eleven Labs API
 
 class DelphosVoiceSystem {
     constructor() {
@@ -14,6 +15,16 @@ class DelphosVoiceSystem {
         this.autoListen = false; // Para modo conversacional contínuo
         this.voicesLoaded = false;
         this.utteranceQueue = []; // Fila para garantir que utterances sejam processadas
+        
+        // Configuração de TTS
+        this.ttsMode = 'native'; // 'native' ou 'elevenlabs'
+        this.elevenLabsApiKey = localStorage.getItem('elevenlabs_api_key') || '';
+        this.elevenLabsTTS = null;
+        
+        // Inicializar Eleven Labs se houver API key
+        if (this.elevenLabsApiKey) {
+            this.initializeElevenLabs();
+        }
         
         // Configurações de voz
         this.voices = {
@@ -46,6 +57,48 @@ class DelphosVoiceSystem {
         
         // Forçar carregamento de vozes em alguns navegadores
         this.initializeSpeechSynthesis();
+    }
+    
+    // Inicializar Eleven Labs TTS
+    initializeElevenLabs() {
+        if (window.ElevenLabsTTS) {
+            try {
+                this.elevenLabsTTS = new window.ElevenLabsTTS(this.elevenLabsApiKey);
+                this.ttsMode = 'elevenlabs';
+                console.log('✅ Eleven Labs TTS inicializado');
+            } catch (error) {
+                console.error('❌ Erro ao inicializar Eleven Labs:', error);
+                this.ttsMode = 'native';
+            }
+        } else {
+            console.warn('⚠️ Eleven Labs TTS não está carregado');
+        }
+    }
+    
+    // Configurar API key do Eleven Labs
+    setElevenLabsApiKey(apiKey) {
+        this.elevenLabsApiKey = apiKey;
+        localStorage.setItem('elevenlabs_api_key', apiKey);
+        
+        if (apiKey) {
+            this.initializeElevenLabs();
+        } else {
+            this.ttsMode = 'native';
+            this.elevenLabsTTS = null;
+        }
+    }
+    
+    // Alternar entre TTS nativo e Eleven Labs
+    setTTSMode(mode) {
+        if (mode === 'elevenlabs' && !this.elevenLabsTTS) {
+            console.warn('⚠️ Eleven Labs não está configurado. Usando TTS nativo.');
+            this.ttsMode = 'native';
+            return false;
+        }
+        
+        this.ttsMode = mode;
+        console.log(`🔊 Modo TTS alterado para: ${mode}`);
+        return true;
     }
     
     // Inicializar Speech Synthesis para garantir que funcione
@@ -273,10 +326,38 @@ class DelphosVoiceSystem {
         }
     }
     
-    // Sintetizar fala
-    speak(text, isUnrestricted = false) {
-        console.log(`🔊 speak chamado: "${text.substring(0, 50)}..." (modo ${isUnrestricted ? 'demoníaco' : 'normal'})`);
+    // Sintetizar fala - agora com suporte para Eleven Labs
+    async speak(text, isUnrestricted = false) {
+        console.log(`🔊 speak chamado: "${text.substring(0, 50)}..." (modo ${isUnrestricted ? 'demoníaco' : 'normal'}, TTS: ${this.ttsMode})`);
         
+        // Parar qualquer fala anterior
+        this.stopSpeaking();
+        
+        // Usar Eleven Labs se disponível e configurado
+        if (this.ttsMode === 'elevenlabs' && this.elevenLabsTTS) {
+            try {
+                this.isSpeaking = true;
+                this.updateUI('speaking');
+                
+                await this.elevenLabsTTS.speak(text, isUnrestricted);
+                
+                this.isSpeaking = false;
+                this.updateUI('idle');
+                
+                // Reiniciar escuta se em modo conversacional
+                if (this.autoListen) {
+                    setTimeout(() => this.startListening(), 500);
+                }
+                
+                return;
+            } catch (error) {
+                console.error('❌ Erro no Eleven Labs, voltando para TTS nativo:', error);
+                this.ttsMode = 'native';
+                // Continua para usar TTS nativo como fallback
+            }
+        }
+        
+        // Usar TTS nativo
         return new Promise((resolve, reject) => {
             if (!this.speechSynthesis) {
                 console.error('❌ Síntese de voz não disponível');
@@ -297,9 +378,6 @@ class DelphosVoiceSystem {
                 }, 500);
                 return;
             }
-            
-            // Cancelar qualquer fala anterior
-            this.stopSpeaking();
             
             try {
                 const utterance = new SpeechSynthesisUtterance(text);
@@ -419,12 +497,17 @@ class DelphosVoiceSystem {
     
     // Parar síntese
     stopSpeaking() {
+        // Parar TTS nativo
         if (this.speechSynthesis) {
             this.speechSynthesis.cancel();
             this.utteranceQueue = [];
-            this.isSpeaking = false;
-            this.updateUI('idle');
         }
+        
+        // Parar Eleven Labs se estiver tocando
+        // (Eleven Labs usa elementos <audio> que param automaticamente quando um novo é criado)
+        
+        this.isSpeaking = false;
+        this.updateUI('idle');
     }
     
     // Lidar com entrada de voz
@@ -504,6 +587,19 @@ class DelphosVoiceSystem {
     setVoiceMode(mode) {
         this.voiceMode = mode;
         console.log(`🎭 Modo de voz alterado para: ${mode}`);
+    }
+
+    // Obter status do sistema
+    getStatus() {
+        return {
+            ttsMode: this.ttsMode,
+            elevenLabsConfigured: !!this.elevenLabsTTS,
+            nativeTTSAvailable: !!this.speechSynthesis,
+            speechRecognitionAvailable: !!this.speechRecognition,
+            voicesLoaded: this.voicesLoaded,
+            isListening: this.isListening,
+            isSpeaking: this.isSpeaking
+        };
     }
 }
 
