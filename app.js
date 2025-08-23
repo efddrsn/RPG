@@ -371,6 +371,7 @@ function resetChat() {
 
 // Sistema de voz
 let voiceSystem = null;
+let ttsEnabled = true; // Controle para ativar/desativar TTS das respostas
 
 // Inicializar sistema de voz
 function initVoiceSystem() {
@@ -382,6 +383,7 @@ function initVoiceSystem() {
         // Configurar botões de voz
         const voiceBtn = document.getElementById('voice-btn');
         const voiceModeBtn = document.getElementById('voice-mode-btn');
+        const ttsToggleBtn = document.getElementById('tts-toggle-btn');
         const voiceIndicator = document.getElementById('voice-indicator');
         
         console.log('🔍 Elementos encontrados:', {
@@ -420,6 +422,20 @@ function initVoiceSystem() {
             console.error('❌ Botão de modo conversacional não encontrado!');
         }
         
+        // Configurar botão de TTS
+        if (ttsToggleBtn) {
+            ttsToggleBtn.addEventListener('click', () => {
+                ttsEnabled = !ttsEnabled;
+                ttsToggleBtn.classList.toggle('active', ttsEnabled);
+                ttsToggleBtn.textContent = ttsEnabled ? '🔊' : '🔇';
+                ttsToggleBtn.title = ttsEnabled ? 'Dublagem ativada' : 'Dublagem desativada';
+                console.log(`🔊 TTS ${ttsEnabled ? 'ativado' : 'desativado'}`);
+            });
+            console.log('✅ Event listener adicionado ao botão de TTS');
+        } else {
+            console.error('❌ Botão de TTS não encontrado!');
+        }
+        
         // Mostrar/esconder indicador de voz
         if (voiceIndicator) {
             const originalUpdateUI = voiceSystem.updateUI.bind(voiceSystem);
@@ -453,11 +469,12 @@ const originalAddMessage = addMessage;
 addMessage = function(message, isUser = false) {
     originalAddMessage(message, isUser);
     
-    // Se for uma mensagem da Delphos e o sistema de voz estiver ativo
-    if (!isUser && voiceSystem && (voiceSystem.autoListen || voiceSystem.isSpeaking)) {
+    // Se for uma mensagem da Delphos, o sistema de voz estiver disponível e TTS estiver habilitado
+    if (!isUser && voiceSystem && ttsEnabled) {
         // Aguardar um pouco para a mensagem ser renderizada
         setTimeout(() => {
             // Usar voz demoníaca se estiver no modo irrestrito
+            console.log(`🔊 Ativando TTS para resposta: modo ${isUnrestrictedMode ? 'demoníaco' : 'normal'}`);
             voiceSystem.speak(message, isUnrestrictedMode);
         }, 100);
     }

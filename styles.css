@@ -413,7 +413,7 @@ body {
 }
 
 /* Estilos para sistema de voz */
-.voice-btn, .voice-mode-btn {
+.voice-btn, .voice-mode-btn, .tts-toggle-btn {
     background: #111;
     border: 1px solid #0ff;
     color: #0ff;
@@ -424,17 +424,17 @@ body {
     margin-left: 10px;
 }
 
-.voice-btn:hover, .voice-mode-btn:hover {
+.voice-btn:hover, .voice-mode-btn:hover, .tts-toggle-btn:hover {
     background: #0ff;
     color: #000;
     box-shadow: 0 0 15px #0ff;
 }
 
-.voice-btn:active, .voice-mode-btn:active {
+.voice-btn:active, .voice-mode-btn:active, .tts-toggle-btn:active {
     transform: scale(0.95);
 }
 
-.voice-mode-btn.active {
+.voice-mode-btn.active, .tts-toggle-btn.active {
     background: #0ff;
     color: #000;
     animation: pulse 2s infinite;
