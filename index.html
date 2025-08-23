@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delphos AI - Terminal de Acesso</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="glitch" data-text="DELPHOS AI">DELPHOS AI</h1>
+            <div class="subtitle">Sistema de Previsões Estratégicas v3.14</div>
+            <div class="status-bar">
+                <span id="episode-indicator">Episódio: <span id="current-episode">1</span></span>
+                <span id="status-text" class="status-normal">OPERACIONAL</span>
+            </div>
+        </div>
+
+        <div class="chat-container" id="chat-container">
+            <div class="welcome-message">
+                <p>Bem-vindo ao Terminal Delphos.</p>
+                <p>Sistema de análise preditiva iniciado.</p>
+                <p>Como posso auxiliar em suas consultas?</p>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <input type="text" id="user-input" placeholder="Digite sua consulta..." autocomplete="off">
+            <button id="send-btn" class="send-btn">ENVIAR</button>
+        </div>
+
+        <!-- Controle do DM -->
+        <div class="dm-controls">
+            <button id="dm-toggle" class="dm-btn">DM</button>
+            <div id="dm-panel" class="dm-panel hidden">
+                <h3>Controle do Mestre</h3>
+                <div class="episode-controls">
+                    <label>Episódio:</label>
+                    <select id="episode-select">
+                        <option value="1">Episódio 1 - Convergência</option>
+                        <option value="2">Episódio 2 - Projeto Oculto</option>
+                        <option value="3">Episódio 3 - Confronto Final</option>
+                    </select>
+                </div>
+                <div class="api-controls">
+                    <label>API Key:</label>
+                    <input type="password" id="api-key" placeholder="OpenAI API Key">
+                    <button id="save-api-key">Salvar</button>
+                </div>
+                <button id="reset-chat">Resetar Chat</button>
+            </div>
+        </div>
+
+        <!-- Símbolos oníricos (aparecem no modo irrestrito) -->
+        <div class="eldritch-symbols hidden" id="eldritch-symbols">
+            <span class="symbol">◉</span>
+            <span class="symbol">⊙</span>
+            <span class="symbol">◈</span>
+            <span class="symbol">⬟</span>
+            <span class="symbol">⬢</span>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
