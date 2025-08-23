@@ -369,5 +369,138 @@ function resetChat() {
     changeEpisode(currentEpisode);
 }
 
+// Sistema de voz
+let voiceSystem = null;
+
+// Inicializar sistema de voz
+function initVoiceSystem() {
+    try {
+        voiceSystem = new DelphosVoiceSystem();
+        
+        // Configurar botões de voz
+        const voiceBtn = document.getElementById('voice-btn');
+        const voiceModeBtn = document.getElementById('voice-mode-btn');
+        const voiceIndicator = document.getElementById('voice-indicator');
+        
+        // Botão de gravação
+        voiceBtn.addEventListener('click', () => {
+            if (voiceSystem.isListening) {
+                voiceSystem.stopListening();
+            } else {
+                voiceSystem.startListening();
+            }
+        });
+        
+        // Botão de modo conversacional
+        voiceModeBtn.addEventListener('click', () => {
+            const isActive = voiceSystem.toggleConversationalMode();
+            voiceModeBtn.classList.toggle('active', isActive);
+            voiceModeBtn.title = isActive ? 'Modo conversacional ativo' : 'Modo conversacional';
+        });
+        
+        // Mostrar/esconder indicador de voz
+        const originalUpdateUI = voiceSystem.updateUI.bind(voiceSystem);
+        voiceSystem.updateUI = function(state, error) {
+            originalUpdateUI(state, error);
+            
+            if (state === 'idle') {
+                setTimeout(() => {
+                    if (!this.isListening && !this.isSpeaking) {
+                        voiceIndicator.classList.add('hidden');
+                    }
+                }, 500);
+            } else {
+                voiceIndicator.classList.remove('hidden');
+            }
+        };
+        
+        console.log('🎙️ Sistema de voz inicializado');
+    } catch (error) {
+        console.error('Erro ao inicializar sistema de voz:', error);
+    }
+}
+
+// Integrar síntese de voz nas respostas da Delphos
+const originalAddMessage = addMessage;
+addMessage = function(message, isUser = false) {
+    originalAddMessage(message, isUser);
+    
+    // Se for uma mensagem da Delphos e o sistema de voz estiver ativo
+    if (!isUser && voiceSystem && (voiceSystem.autoListen || voiceSystem.isSpeaking)) {
+        // Aguardar um pouco para a mensagem ser renderizada
+        setTimeout(() => {
+            // Usar voz demoníaca se estiver no modo irrestrito
+            voiceSystem.speak(message, isUnrestrictedMode);
+        }, 100);
+    }
+};
+
+// Atualizar modo de voz quando entrar/sair do modo irrestrito
+const originalActivateUnrestrictedMode = activateUnrestrictedMode;
+activateUnrestrictedMode = function() {
+    originalActivateUnrestrictedMode();
+    
+    if (voiceSystem) {
+        voiceSystem.setVoiceMode('demonic');
+    }
+    
+    // Adicionar classe ao body para estilos especiais
+    document.body.classList.add('unrestricted');
+};
+
+// Remover modo demoníaco ao resetar
+const originalResetChat = resetChat;
+resetChat = function() {
+    originalResetChat();
+    
+    if (voiceSystem) {
+        voiceSystem.setVoiceMode('normal');
+        voiceSystem.stopSpeaking();
+        voiceSystem.stopListening();
+    }
+    
+    document.body.classList.remove('unrestricted');
+};
+
+// Função auxiliar para comandos de voz especiais
+window.voiceCommands = {
+    // Ativar modo de teste por voz
+    'ativar modo de teste': () => {
+        window.testUnrestricted();
+    },
+    
+    // Parar tudo
+    'parar': () => {
+        if (voiceSystem) {
+            voiceSystem.stopSpeaking();
+            voiceSystem.stopListening();
+        }
+    }
+};
+
+// Verificar comandos especiais nas transcrições
+const originalHandleVoiceInput = voiceSystem ? voiceSystem.handleVoiceInput.bind(voiceSystem) : null;
+if (voiceSystem) {
+    voiceSystem.handleVoiceInput = function(transcript) {
+        const lowerTranscript = transcript.toLowerCase();
+        
+        // Verificar comandos especiais
+        for (const [command, action] of Object.entries(window.voiceCommands)) {
+            if (lowerTranscript.includes(command)) {
+                action();
+                return;
+            }
+        }
+        
+        // Processar normalmente
+        originalHandleVoiceInput(transcript);
+    };
+}
+
 // Iniciar aplicação
 init();
+
+// Inicializar sistema de voz após o DOM carregar
+setTimeout(() => {
+    initVoiceSystem();
+}, 100);

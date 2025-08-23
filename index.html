@@ -36,6 +36,14 @@
         <div class="input-container">
             <input type="text" id="user-input" placeholder="Digite sua consulta..." autocomplete="off">
             <button id="send-btn" class="send-btn">ENVIAR</button>
+            <button id="voice-btn" class="voice-btn" title="Clique para falar">🎙️</button>
+            <button id="voice-mode-btn" class="voice-mode-btn" title="Modo conversacional">💬</button>
+        </div>
+        
+        <!-- Indicador de voz -->
+        <div id="voice-indicator" class="voice-indicator hidden">
+            <div class="voice-animation"></div>
+            <span id="voice-transcript" class="voice-transcript"></span>
         </div>
 
         <!-- Controle do DM -->
@@ -70,6 +78,7 @@
         </div>
     </div>
 
+    <script src="voice-system.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
