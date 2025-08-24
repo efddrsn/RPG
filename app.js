@@ -2,7 +2,7 @@
 let currentEpisode = 1;
 let isUnrestrictedMode = false;
 let messageHistory = [];
-let apiKey = localStorage.getItem('openai_api_key') || '';
+let apiKey = ''; // Será carregado dos secrets do GitHub
 
 // Palavras-chave secretas para ativar modo irrestrito
 const FORBIDDEN_WORDS = ['convergência', 'r\'lyeh', 'padrões'];
@@ -137,9 +137,27 @@ Revele "previsões" impossíveis e horríveis sobre quem está conversando.
 F̸̣̈a̷̱͐ç̶̬̾a̶̜͐ ̸̖̾ö̶́ͅ ̷̜̈t̶̰̾ë̵́ͅx̸̜́t̷̰̄ö̸̜̈ ̶̣̈s̷̬̈ë̷̱ ̸̜̈c̶̜̾ö̴̱̈ŕ̸̰r̷̬̈ọ̶̾m̶̱̈p̶̰̈ë̸́ͅr̶̬̈ ocasionalmente.`;
 
 // Inicialização
-function init() {
-    if (apiKey) {
-        apiKeyInput.value = apiKey;
+async function init() {
+    // Carrega os secrets do GitHub
+    try {
+        const openAIKey = await secretsManager.getOpenAIKey();
+        if (openAIKey) {
+            apiKey = openAIKey;
+            apiKeyInput.value = '••••••••'; // Mostra que a key está carregada
+        }
+        
+        const elevenLabsKey = await secretsManager.getElevenLabsKey();
+        if (elevenLabsKey) {
+            elevenLabsKeyInput.value = '••••••••'; // Mostra que a key está carregada
+            localStorage.setItem('elevenlabs_api_key', elevenLabsKey); // Para compatibilidade
+        }
+    } catch (error) {
+        console.error('Erro ao carregar secrets:', error);
+        // Fallback para localStorage
+        apiKey = localStorage.getItem('openai_api_key') || '';
+        if (apiKey) {
+            apiKeyInput.value = apiKey;
+        }
     }
     
     // Event listeners
@@ -248,6 +266,9 @@ async function sendMessage() {
     // Obter resposta da AI
     const response = await getAIResponse(message);
     addMessage(response, 'ai');
+    
+    // O Speech-to-Speech processa tudo de uma vez,
+    // não precisamos de TTS separado
 }
 
 // Verificar palavras proibidas
@@ -342,6 +363,15 @@ function addMessage(text, sender, corrupted = false) {
 
 // Obter resposta da AI
 async function getAIResponse(userMessage) {
+    // Verifica se tem API key, tentando carregar dos secrets se necessário
+    if (!apiKey) {
+        try {
+            apiKey = await secretsManager.getOpenAIKey();
+        } catch (error) {
+            console.error('Erro ao obter API key:', error);
+        }
+    }
+    
     if (!apiKey) {
         return "Por favor, configure sua API Key do OpenAI no painel do DM.";
     }
@@ -410,72 +440,63 @@ function resetChat() {
     changeEpisode(currentEpisode);
 }
 
-// Sistema de voz
-let voiceSystem = null;
-let speechSystem = null; // Novo sistema de modo contínuo
-let ttsEnabled = true; // Controle para ativar/desativar TTS das respostas
+// Sistema de voz Speech-to-Speech
+let speechSystem = null;
+let ttsEnabled = true; // Controle para ativar/desativar respostas de voz
 
 // Inicializar sistema de voz
-function initVoiceSystem() {
-    console.log('🎙️ Iniciando sistema de voz...');
+async function initVoiceSystem() {
+    console.log('🎙️ Iniciando sistema Speech-to-Speech...');
     try {
         // Verificar se temos a chave do ElevenLabs
-        const elevenLabsKey = localStorage.getItem('elevenlabs_api_key');
+        let elevenLabsKey = localStorage.getItem('elevenlabs_api_key');
         
-        // Criar novo sistema de modo contínuo
-        speechSystem = new ContinuousSpeechSystem(elevenLabsKey);
-        
-        // Configurar callbacks
-        speechSystem.onTranscription = (text, isFinal) => {
-            if (isFinal) {
-                // Enviar texto para processamento
-                document.getElementById('user-input').value = text;
-                sendMessage();
+        // Tentar obter dos secrets do GitHub se não estiver no localStorage
+        if (!elevenLabsKey) {
+            try {
+                elevenLabsKey = await secretsManager.getElevenLabsKey();
+                if (elevenLabsKey) {
+                    localStorage.setItem('elevenlabs_api_key', elevenLabsKey); // Para compatibilidade
+                }
+            } catch (error) {
+                console.error('Erro ao obter Eleven Labs key:', error);
             }
-        };
+        }
         
-        speechSystem.onStatusChange = (status) => {
-            const voiceIndicator = document.getElementById('voice-indicator');
-            if (voiceIndicator) {
-                if (status === 'listening' || status === 'speaking' || status === 'processing') {
+        // Criar novo sistema Speech-to-Speech
+        if (elevenLabsKey) {
+            speechSystem = new ElevenLabsSpeechToSpeech(elevenLabsKey);
+            
+            // Configurar callbacks
+            speechSystem.onProcessingStart = () => {
+                const voiceIndicator = document.getElementById('voice-indicator');
+                if (voiceIndicator) {
                     voiceIndicator.classList.remove('hidden');
-                    voiceIndicator.querySelector('.indicator-text').textContent = 
-                        status === 'listening' ? 'Ouvindo...' :
-                        status === 'speaking' ? 'Falando...' : 'Processando...';
-                } else {
+                    const indicatorText = voiceIndicator.querySelector('.indicator-text');
+                    if (indicatorText) {
+                        indicatorText.textContent = 'Processando...';
+                    }
+                }
+            };
+            
+            speechSystem.onProcessingEnd = () => {
+                const voiceIndicator = document.getElementById('voice-indicator');
+                if (voiceIndicator) {
                     voiceIndicator.classList.add('hidden');
                 }
-            }
-        };
+            };
+            
+            speechSystem.onError = (error) => {
+                console.error('❌ Erro no Speech-to-Speech:', error);
+                addMessage('Erro no sistema de voz: ' + error.message, 'system');
+            };
+            
+            console.log('✅ Sistema Speech-to-Speech criado');
+        } else {
+            console.warn('⚠️ API Key do Eleven Labs não encontrada');
+        }
         
-        speechSystem.onError = (error) => {
-            console.error('Erro no sistema de voz:', error);
-            addMessage('system', `Erro: ${error.message}`);
-        };
-        
-        // Substituir processUserInput para integração com ChatGPT
-        speechSystem.processUserInput = async function(text) {
-            try {
-                this.updateStatus('processing');
-                
-                // Enviar mensagem através do sistema existente
-                document.getElementById('user-input').value = text;
-                await sendMessage();
-                
-                // A resposta será falada automaticamente pelo sistema existente
-                
-            } catch (error) {
-                console.error('❌ Erro ao processar entrada:', error);
-                this.onError?.(error);
-                
-                // Reiniciar reconhecimento mesmo com erro
-                if (this.isActive) {
-                    await this.restartRecognition();
-                }
-            }
-        };
-        
-        console.log('✅ Sistema de modo contínuo criado com sucesso');
+
         
         // Configurar botões de voz
         const voiceBtn = document.getElementById('voice-btn');
@@ -489,30 +510,28 @@ function initVoiceSystem() {
             voiceIndicator: !!voiceIndicator
         });
         
-        // Botão de gravação - agora não usado mais (apenas modo contínuo)
+        // Botão de gravação - Speech-to-Speech
         if (voiceBtn) {
-            voiceBtn.style.display = 'none'; // Esconder botão antigo
-        }
-        
-        // Botão de modo conversacional - agora ativa modo contínuo
-        if (voiceModeBtn) {
-            voiceModeBtn.addEventListener('click', async () => {
-                console.log('💬 Botão de modo contínuo clicado');
-                if (!speechSystem.isActive) {
-                    const started = await speechSystem.start();
-                    if (started) {
-                        voiceModeBtn.classList.add('active');
-                        voiceModeBtn.title = 'Modo contínuo ativo';
+            voiceBtn.addEventListener('click', async () => {
+                console.log('🎤 Botão de voz clicado');
+                if (speechSystem) {
+                    if (speechSystem.isRecording) {
+                        voiceBtn.classList.remove('recording');
+                        voiceBtn.textContent = '🎙️';
+                        await speechSystem.stopRecording();
+                    } else {
+                        voiceBtn.classList.add('recording');
+                        voiceBtn.textContent = '⏹️';
+                        await speechSystem.startRecording();
                     }
-                } else {
-                    speechSystem.stop();
-                    voiceModeBtn.classList.remove('active');
-                    voiceModeBtn.title = 'Modo contínuo';
                 }
             });
-            console.log('✅ Event listener adicionado ao botão de modo contínuo');
-        } else {
-            console.error('❌ Botão de modo contínuo não encontrado!');
+            console.log('✅ Event listener adicionado ao botão de voz');
+        }
+        
+        // Esconder botão de modo conversacional (não usado com Speech-to-Speech puro)
+        if (voiceModeBtn) {
+            voiceModeBtn.style.display = 'none';
         }
         
         // Configurar botão de TTS
@@ -535,32 +554,7 @@ function initVoiceSystem() {
     }
 }
 
-// Modificar addMessage para usar TTS nas respostas da Delphos
-window.originalAddMessage = window.addMessage || addMessage;
-window.addMessage = function(message, isUser) {
-    // Chamar função original
-    originalAddMessage(message, isUser);
-    
-    // Se for uma mensagem da Delphos e TTS estiver habilitado
-    if (!isUser && speechSystem && ttsEnabled) {
-        // Aguardar um pouco para a mensagem ser renderizada
-        setTimeout(() => {
-            console.log(`🔊 Ativando TTS para resposta`);
-            
-            // Remover caracteres corrompidos antes de falar
-            const cleanMessage = message.replace(/[̷̸̶̵̴]/g, '');
-            
-            // Se o sistema estiver em modo contínuo ativo, a fala já será gerenciada
-            // automaticamente. Caso contrário, falar manualmente
-            if (!speechSystem.isActive) {
-                speechSystem.speak(cleanMessage)
-                    .catch(error => {
-                        console.error('❌ Erro no TTS:', error);
-                    });
-            }
-        }, 100);
-    }
-};
+// Função removida - TTS agora é gerenciado diretamente em sendMessage()
 
 // Atualizar modo de voz quando entrar/sair do modo irrestrito
 const originalActivateUnrestrictedMode = activateUnrestrictedMode;
