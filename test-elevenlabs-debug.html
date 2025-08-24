@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Eleven Labs API - Delphos AI</title>
+    <style>
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .section {
+            background: #111;
+            border: 1px solid #00ff00;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 16px;
+            border-radius: 3px;
+        }
+        button:hover {
+            background: #00cc00;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        input, textarea, select {
+            background: #222;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px;
+            margin: 5px;
+            font-family: inherit;
+            width: 90%;
+            border-radius: 3px;
+        }
+        .log {
+            background: #000;
+            border: 1px solid #333;
+            padding: 15px;
+            margin: 20px 0;
+            height: 400px;
+            overflow-y: scroll;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffff00; }
+        .info { color: #00ffff; }
+        .debug { color: #ff00ff; }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .status-ok { background: #00ff00; }
+        .status-error { background: #ff0000; }
+        .status-pending { background: #ffff00; }
+        
+        audio {
+            margin: 10px 0;
+            width: 100%;
+        }
+        
+        .voice-card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        
+        #audioPlayer {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Debug Eleven Labs API</h1>
+        
+        <!-- Status Section -->
+        <div class="section">
+            <h2>📊 Status da API</h2>
+            <div id="api-status">
+                <p><span class="status-indicator status-pending" id="status-indicator"></span>
+                <span id="status-text">Verificando...</span></p>
+            </div>
+            <button id="check-status">Verificar Status</button>
+            <button id="test-api-key">Testar API Key</button>
+            <button id="list-voices">Listar Vozes Disponíveis</button>
+        </div>
+
+        <!-- Configuration Section -->
+        <div class="section">
+            <h2>⚙️ Configuração</h2>
+            <label>API Key:</label>
+            <input type="password" id="api-key" placeholder="Digite sua API Key da Eleven Labs">
+            <button id="save-api-key">Salvar API Key</button>
+            
+            <div style="margin-top: 15px;">
+                <label>Voice ID (opcional):</label>
+                <input type="text" id="voice-id" placeholder="21m00Tcm4TlvDq8ikWAM">
+                <small style="display: block; color: #666;">Deixe vazio para usar a voz padrão</small>
+            </div>
+        </div>
+
+        <!-- Text-to-Speech Test Section -->
+        <div class="section">
+            <h2>🎤 Teste Text-to-Speech</h2>
+            <textarea id="tts-text" rows="4" placeholder="Digite o texto para converter em fala...">Olá! Este é um teste do sistema de síntese de voz da Eleven Labs.</textarea>
+            
+            <div style="margin: 15px 0;">
+                <label>Modelo:</label>
+                <select id="model-select">
+                    <option value="eleven_monolingual_v1">Monolingual v1 (Rápido)</option>
+                    <option value="eleven_multilingual_v2">Multilingual v2 (Melhor para PT-BR)</option>
+                    <option value="eleven_turbo_v2">Turbo v2 (Ultra rápido)</option>
+                </select>
+            </div>
+            
+            <div style="margin: 15px 0;">
+                <label>Configurações de Voz:</label>
+                <div style="margin: 10px 20px;">
+                    <label>Stability: <input type="range" id="stability" min="0" max="1" step="0.1" value="0.5"> <span id="stability-value">0.5</span></label><br>
+                    <label>Similarity: <input type="range" id="similarity" min="0" max="1" step="0.1" value="0.75"> <span id="similarity-value">0.75</span></label><br>
+                    <label>Style: <input type="range" id="style" min="0" max="1" step="0.1" value="0"> <span id="style-value">0</span></label><br>
+                    <label>Speaker Boost: <input type="checkbox" id="speaker-boost"></label>
+                </div>
+            </div>
+            
+            <button id="test-tts">Testar TTS</button>
+            <button id="test-tts-stream">Testar TTS (Streaming)</button>
+            <button id="stop-audio">Parar Áudio</button>
+            
+            <div id="audioPlayer"></div>
+        </div>
+
+        <!-- Speech-to-Speech Test Section -->
+        <div class="section">
+            <h2>🎙️ Teste Speech-to-Speech (BETA)</h2>
+            <p style="color: #ffff00;">⚠️ A API Speech-to-Speech está em beta e requer permissões especiais.</p>
+            
+            <div style="margin: 15px 0;">
+                <label>Arquivo de áudio (MP3, WAV, etc):</label>
+                <input type="file" id="audio-file" accept="audio/*">
+            </div>
+            
+            <button id="test-sts" disabled>Testar Speech-to-Speech</button>
+            <button id="record-audio">🎤 Gravar Áudio</button>
+            <button id="stop-recording" disabled>⏹️ Parar Gravação</button>
+            
+            <div id="recording-status" style="margin-top: 10px; color: #ff0000;"></div>
+            <audio id="recorded-audio" controls style="display: none; margin-top: 10px;"></audio>
+        </div>
+
+        <!-- Voice List Section -->
+        <div class="section" id="voices-section" style="display: none;">
+            <h2>🎭 Vozes Disponíveis</h2>
+            <div id="voices-list"></div>
+        </div>
+
+        <!-- Debug Log -->
+        <div class="section">
+            <h2>📝 Log de Debug</h2>
+            <div class="log" id="debug-log"></div>
+            <button id="clear-log">Limpar Log</button>
+            <button id="export-log">Exportar Log</button>
+        </div>
+    </div>
+
+    <script src="elevenlabs-tts.js"></script>
+    <script>
+        // Sistema de log aprimorado
+        const logDiv = document.getElementById('debug-log');
+        const logs = [];
+        
+        function log(message, type = 'info', details = null) {
+            const timestamp = new Date().toISOString();
+            const entry = {
+                timestamp,
+                type,
+                message,
+                details
+            };
+            logs.push(entry);
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.innerHTML = `[${timestamp}] <strong>${type.toUpperCase()}</strong>: ${message}`;
+            
+            if (details) {
+                const detailsDiv = document.createElement('div');
+                detailsDiv.style.marginLeft = '20px';
+                detailsDiv.style.fontSize = '12px';
+                detailsDiv.style.color = '#888';
+                detailsDiv.textContent = JSON.stringify(details, null, 2);
+                logEntry.appendChild(detailsDiv);
+            }
+            
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Configuração inicial
+        let apiKey = localStorage.getItem('elevenlabs_api_key') || '';
+        let elevenLabsTTS = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        
+        // Elementos DOM
+        const apiKeyInput = document.getElementById('api-key');
+        const voiceIdInput = document.getElementById('voice-id');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        
+        // Atualizar valores dos sliders
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.addEventListener('input', (e) => {
+                const valueSpan = document.getElementById(e.target.id + '-value');
+                if (valueSpan) valueSpan.textContent = e.target.value;
+            });
+        });
+        
+        // Carregar API key se existir
+        if (apiKey) {
+            apiKeyInput.value = apiKey;
+            initializeElevenLabs();
+        }
+
+        // Inicializar Eleven Labs
+        function initializeElevenLabs() {
+            try {
+                elevenLabsTTS = new ElevenLabsTTS(apiKey);
+                log('Eleven Labs TTS inicializado', 'success');
+                updateStatus('ok', 'API Key configurada');
+                return true;
+            } catch (error) {
+                log('Erro ao inicializar Eleven Labs', 'error', error.message);
+                updateStatus('error', 'Erro ao inicializar');
+                return false;
+            }
+        }
+
+        // Atualizar status visual
+        function updateStatus(status, message) {
+            statusIndicator.className = 'status-indicator status-' + status;
+            statusText.textContent = message;
+        }
+
+        // Salvar API Key
+        document.getElementById('save-api-key').addEventListener('click', () => {
+            apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                log('API Key vazia', 'error');
+                alert('Por favor, insira uma API Key válida');
+                return;
+            }
+            
+            localStorage.setItem('elevenlabs_api_key', apiKey);
+            if (initializeElevenLabs()) {
+                log('API Key salva e validada', 'success');
+                alert('API Key salva com sucesso!');
+            }
+        });
+
+        // Verificar status da API
+        document.getElementById('check-status').addEventListener('click', async () => {
+            log('Verificando status da API...', 'info');
+            
+            try {
+                const response = await fetch('https://api.elevenlabs.io/v1/user', {
+                    headers: {
+                        'xi-api-key': apiKey
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('API está funcionando', 'success', data);
+                    updateStatus('ok', 'API funcionando corretamente');
+                    
+                    // Mostrar informações da conta
+                    log(`Subscription: ${data.subscription.tier}`, 'info');
+                    log(`Character count: ${data.subscription.character_count}/${data.subscription.character_limit}`, 'info');
+                } else {
+                    const error = await response.text();
+                    log('Erro ao verificar status', 'error', { status: response.status, error });
+                    updateStatus('error', `Erro ${response.status}`);
+                }
+            } catch (error) {
+                log('Erro de conexão', 'error', error.message);
+                updateStatus('error', 'Erro de conexão');
+            }
+        });
+
+        // Testar API Key
+        document.getElementById('test-api-key').addEventListener('click', async () => {
+            if (!elevenLabsTTS) {
+                log('TTS não inicializado', 'error');
+                alert('Configure a API Key primeiro');
+                return;
+            }
+            
+            log('Testando API Key...', 'info');
+            
+            try {
+                const voices = await elevenLabsTTS.getVoices();
+                log(`API Key válida! ${voices.length} vozes encontradas`, 'success');
+                updateStatus('ok', 'API Key válida');
+            } catch (error) {
+                log('API Key inválida ou erro na API', 'error', error.message);
+                updateStatus('error', 'API Key inválida');
+            }
+        });
+
+        // Listar vozes
+        document.getElementById('list-voices').addEventListener('click', async () => {
+            if (!elevenLabsTTS) {
+                log('TTS não inicializado', 'error');
+                return;
+            }
+            
+            log('Listando vozes disponíveis...', 'info');
+            
+            try {
+                const voices = await elevenLabsTTS.getVoices();
+                log(`${voices.length} vozes encontradas`, 'success');
+                
+                const voicesSection = document.getElementById('voices-section');
+                const voicesList = document.getElementById('voices-list');
+                voicesList.innerHTML = '';
+                
+                voices.forEach(voice => {
+                    const voiceCard = document.createElement('div');
+                    voiceCard.className = 'voice-card';
+                    voiceCard.innerHTML = `
+                        <strong>${voice.name}</strong> (${voice.voice_id})<br>
+                        <small>
+                            Labels: ${voice.labels ? Object.entries(voice.labels).map(([k, v]) => `${k}: ${v}`).join(', ') : 'None'}<br>
+                            Category: ${voice.category || 'N/A'}
+                        </small>
+                        <button onclick="setVoiceId('${voice.voice_id}')">Usar esta voz</button>
+                    `;
+                    voicesList.appendChild(voiceCard);
+                });
+                
+                voicesSection.style.display = 'block';
+            } catch (error) {
+                log('Erro ao listar vozes', 'error', error.message);
+            }
+        });
+
+        // Definir Voice ID
+        window.setVoiceId = (id) => {
+            voiceIdInput.value = id;
+            log(`Voice ID definido: ${id}`, 'info');
+        };
+
+        // Testar TTS
+        document.getElementById('test-tts').addEventListener('click', async () => {
+            if (!elevenLabsTTS) {
+                log('TTS não inicializado', 'error');
+                return;
+            }
+            
+            const text = document.getElementById('tts-text').value;
+            const voiceId = voiceIdInput.value || elevenLabsTTS.voiceIds.normal;
+            const modelId = document.getElementById('model-select').value;
+            
+            const voiceSettings = {
+                stability: parseFloat(document.getElementById('stability').value),
+                similarity_boost: parseFloat(document.getElementById('similarity').value),
+                style: parseFloat(document.getElementById('style').value),
+                use_speaker_boost: document.getElementById('speaker-boost').checked
+            };
+            
+            log('Iniciando teste TTS...', 'info', {
+                text: text.substring(0, 50) + '...',
+                voiceId,
+                modelId,
+                voiceSettings
+            });
+            
+            try {
+                const audioUrl = await elevenLabsTTS.textToSpeech(text, {
+                    voiceId,
+                    modelId,
+                    voiceSettings
+                });
+                
+                log('Áudio gerado com sucesso', 'success', { audioUrl });
+                
+                // Criar player de áudio
+                const audioPlayer = document.getElementById('audioPlayer');
+                audioPlayer.innerHTML = `
+                    <audio controls autoplay>
+                        <source src="${audioUrl}" type="audio/mpeg">
+                        Seu navegador não suporta o elemento de áudio.
+                    </audio>
+                `;
+                
+            } catch (error) {
+                log('Erro ao gerar TTS', 'error', error.message);
+                
+                // Tentar capturar mais detalhes do erro
+                if (error.message.includes('401')) {
+                    log('Erro de autenticação - verifique sua API Key', 'error');
+                } else if (error.message.includes('403')) {
+                    log('Erro de permissão - sua API Key pode não ter acesso a este recurso', 'error');
+                } else if (error.message.includes('429')) {
+                    log('Rate limit excedido - aguarde um momento', 'error');
+                }
+            }
+        });
+
+        // Testar TTS com streaming
+        document.getElementById('test-tts-stream').addEventListener('click', async () => {
+            if (!elevenLabsTTS) {
+                log('TTS não inicializado', 'error');
+                return;
+            }
+            
+            const text = document.getElementById('tts-text').value;
+            const voiceId = voiceIdInput.value || elevenLabsTTS.voiceIds.normal;
+            const modelId = document.getElementById('model-select').value;
+            
+            log('Iniciando teste TTS com streaming...', 'info');
+            
+            try {
+                const response = await fetch(
+                    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'audio/mpeg',
+                            'Content-Type': 'application/json',
+                            'xi-api-key': apiKey
+                        },
+                        body: JSON.stringify({
+                            text,
+                            model_id: modelId,
+                            voice_settings: {
+                                stability: parseFloat(document.getElementById('stability').value),
+                                similarity_boost: parseFloat(document.getElementById('similarity').value)
+                            }
+                        })
+                    }
+                );
+                
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(`${response.status}: ${error}`);
+                }
+                
+                log('Stream iniciado com sucesso', 'success');
+                
+                // Criar blob a partir do stream
+                const blob = await response.blob();
+                const audioUrl = URL.createObjectURL(blob);
+                
+                const audioPlayer = document.getElementById('audioPlayer');
+                audioPlayer.innerHTML = `
+                    <audio controls autoplay>
+                        <source src="${audioUrl}" type="audio/mpeg">
+                    </audio>
+                `;
+                
+            } catch (error) {
+                log('Erro no streaming TTS', 'error', error.message);
+            }
+        });
+
+        // Parar áudio
+        document.getElementById('stop-audio').addEventListener('click', () => {
+            const audio = document.querySelector('audio');
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+                log('Áudio parado', 'info');
+            }
+        });
+
+        // Limpar log
+        document.getElementById('clear-log').addEventListener('click', () => {
+            logDiv.innerHTML = '';
+            logs.length = 0;
+            log('Log limpo', 'info');
+        });
+
+        // Exportar log
+        document.getElementById('export-log').addEventListener('click', () => {
+            const logText = logs.map(entry => 
+                `[${entry.timestamp}] ${entry.type.toUpperCase()}: ${entry.message}${entry.details ? '\n  Details: ' + JSON.stringify(entry.details) : ''}`
+            ).join('\n');
+            
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `elevenlabs-debug-${new Date().toISOString()}.log`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            log('Log exportado', 'success');
+        });
+
+        // Gravação de áudio
+        document.getElementById('record-audio').addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    const recordedAudio = document.getElementById('recorded-audio');
+                    recordedAudio.src = audioUrl;
+                    recordedAudio.style.display = 'block';
+                    
+                    document.getElementById('test-sts').disabled = false;
+                    log('Gravação concluída', 'success');
+                };
+                
+                mediaRecorder.start();
+                document.getElementById('record-audio').disabled = true;
+                document.getElementById('stop-recording').disabled = false;
+                document.getElementById('recording-status').textContent = '🔴 Gravando...';
+                log('Gravação iniciada', 'info');
+                
+            } catch (error) {
+                log('Erro ao acessar microfone', 'error', error.message);
+            }
+        });
+
+        document.getElementById('stop-recording').addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                
+                document.getElementById('record-audio').disabled = false;
+                document.getElementById('stop-recording').disabled = true;
+                document.getElementById('recording-status').textContent = '';
+            }
+        });
+
+        // Speech-to-Speech
+        document.getElementById('test-sts').addEventListener('click', async () => {
+            log('Speech-to-Speech ainda não implementado', 'warning');
+            log('A API Speech-to-Speech da Eleven Labs está em beta e requer acesso especial', 'info');
+            
+            // Aqui você pode implementar a chamada para a API speech-to-speech
+            // quando tiver acesso à documentação completa
+        });
+
+        // Habilitar botão STS quando arquivo for selecionado
+        document.getElementById('audio-file').addEventListener('change', (e) => {
+            document.getElementById('test-sts').disabled = !e.target.files.length;
+        });
+
+        // Log inicial
+        log('Sistema de debug Eleven Labs carregado', 'success');
+        log('Use a API Key para começar os testes', 'info');
+        
+        // Verificar se há API key salva
+        if (apiKey) {
+            log('API Key encontrada no localStorage', 'info');
+            document.getElementById('check-status').click();
+        }
+    </script>
+</body>
+</html>

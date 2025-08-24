@@ -21,10 +21,13 @@ class DelphosVoiceSystem {
         this.elevenLabsApiKey = localStorage.getItem('elevenlabs_api_key') || '';
         this.elevenLabsTTS = null;
         
-        // Inicializar Eleven Labs se houver API key
-        if (this.elevenLabsApiKey) {
-            this.initializeElevenLabs();
-        }
+            // Inicializar Eleven Labs se houver API key
+    if (this.elevenLabsApiKey) {
+        this.initializeElevenLabs();
+    }
+    
+    // Verificar se deve usar a versão aprimorada
+    this.useEnhancedVersion = true;
         
         // Configurações de voz
         this.voices = {
@@ -61,7 +64,20 @@ class DelphosVoiceSystem {
     
     // Inicializar Eleven Labs TTS
     initializeElevenLabs() {
-        if (window.ElevenLabsTTS) {
+        // Tentar usar versão aprimorada primeiro
+        if (this.useEnhancedVersion && window.ElevenLabsEnhanced) {
+            try {
+                this.elevenLabsTTS = new window.ElevenLabsEnhanced(this.elevenLabsApiKey);
+                this.ttsMode = 'elevenlabs';
+                console.log('✅ Eleven Labs Enhanced inicializado');
+                
+                // Validar API key imediatamente
+                this.validateElevenLabsConnection();
+            } catch (error) {
+                console.error('❌ Erro ao inicializar Eleven Labs Enhanced:', error);
+                this.ttsMode = 'native';
+            }
+        } else if (window.ElevenLabsTTS) {
             try {
                 this.elevenLabsTTS = new window.ElevenLabsTTS(this.elevenLabsApiKey);
                 this.ttsMode = 'elevenlabs';
@@ -72,6 +88,29 @@ class DelphosVoiceSystem {
             }
         } else {
             console.warn('⚠️ Eleven Labs TTS não está carregado');
+        }
+    }
+    
+    // Validar conexão com Eleven Labs
+    async validateElevenLabsConnection() {
+        if (!this.elevenLabsTTS || !this.elevenLabsTTS.validateApiKey) {
+            return;
+        }
+        
+        try {
+            const validation = await this.elevenLabsTTS.validateApiKey();
+            if (validation.valid) {
+                console.log('✅ API Key validada:', {
+                    subscription: validation.subscription?.tier,
+                    usage: `${validation.characterCount}/${validation.characterLimit} caracteres`
+                });
+            } else {
+                console.error('❌ API Key inválida:', validation.error);
+                this.ttsMode = 'native';
+                this.elevenLabsTTS = null;
+            }
+        } catch (error) {
+            console.error('❌ Erro ao validar API Key:', error);
         }
     }
     
@@ -339,7 +378,20 @@ class DelphosVoiceSystem {
                 this.isSpeaking = true;
                 this.updateUI('speaking');
                 
-                await this.elevenLabsTTS.speak(text, isUnrestricted);
+                // Usar método aprimorado se disponível
+                if (this.elevenLabsTTS.speakText) {
+                    await this.elevenLabsTTS.speakText(text, {
+                        voiceId: isUnrestricted ? this.elevenLabsTTS.voiceIds.demonic : this.elevenLabsTTS.voiceIds.normal,
+                        modelId: this.elevenLabsTTS.models?.multilingual_v2 || 'eleven_multilingual_v2',
+                        volume: 1.0,
+                        onStart: () => console.log('🎤 Eleven Labs começou a falar'),
+                        onEnd: () => console.log('✅ Eleven Labs terminou de falar'),
+                        onError: (error) => console.error('❌ Erro na reprodução:', error)
+                    });
+                } else {
+                    // Fallback para método antigo
+                    await this.elevenLabsTTS.speak(text, isUnrestricted);
+                }
                 
                 this.isSpeaking = false;
                 this.updateUI('idle');
@@ -351,8 +403,23 @@ class DelphosVoiceSystem {
                 
                 return;
             } catch (error) {
-                console.error('❌ Erro no Eleven Labs, voltando para TTS nativo:', error);
-                this.ttsMode = 'native';
+                console.error('❌ Erro no Eleven Labs:', error);
+                
+                // Se for erro de API key, desabilitar Eleven Labs
+                if (error.message.includes('401') || error.message.includes('API Key')) {
+                    console.error('🔑 Problema com API Key, desabilitando Eleven Labs');
+                    this.ttsMode = 'native';
+                    this.elevenLabsTTS = null;
+                    alert('Erro na API Key da Eleven Labs. Voltando para TTS nativo.');
+                } else if (error.message.includes('429')) {
+                    console.warn('⏰ Rate limit excedido, tentando novamente em 5 segundos...');
+                    setTimeout(() => this.speak(text, isUnrestricted), 5000);
+                    return;
+                } else {
+                    // Para outros erros, tentar TTS nativo
+                    console.log('🔄 Voltando para TTS nativo como fallback');
+                    this.ttsMode = 'native';
+                }
                 // Continua para usar TTS nativo como fallback
             }
         }
