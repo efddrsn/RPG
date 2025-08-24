@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delphos AI - Speech-to-Speech Avançado</title>
+    <style>
+        :root {
+            --primary-color: #00ff41;
+            --danger-color: #ff0000;
+            --demon-color: #8b0000;
+            --bg-color: #0a0a0a;
+            --surface-color: #1a1a1a;
+            --text-color: #e0e0e0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        body.demonic-mode {
+            background: radial-gradient(circle at center, #1a0000 0%, #000 100%);
+        }
+
+        body.ultra-demonic-mode {
+            background: radial-gradient(circle at center, #2a0000 0%, #000 100%);
+            animation: demonicPulse 2s infinite;
+        }
+
+        @keyframes demonicPulse {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.2) hue-rotate(10deg); }
+        }
+
+        .header {
+            background: linear-gradient(180deg, var(--surface-color) 0%, transparent 100%);
+            padding: 2rem;
+            text-align: center;
+            border-bottom: 1px solid var(--primary-color);
+        }
+
+        .demonic-mode .header {
+            border-bottom-color: var(--danger-color);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 10px currentColor;
+            transition: all 0.3s ease;
+        }
+
+        .demonic-mode h1 {
+            color: var(--danger-color);
+            animation: glitch 0.3s infinite;
+        }
+
+        @keyframes glitch {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .control-section {
+            background: var(--surface-color);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .demonic-mode .control-section {
+            border-color: var(--demon-color);
+            box-shadow: 0 0 20px rgba(139, 0, 0, 0.3);
+        }
+
+        .control-section h3 {
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .demonic-mode .control-section h3 {
+            color: var(--danger-color);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border: 1px solid var(--primary-color);
+            background: transparent;
+            color: var(--primary-color);
+            cursor: pointer;
+            border-radius: 4px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover {
+            background: var(--primary-color);
+            color: var(--bg-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 255, 65, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.danger {
+            border-color: var(--danger-color);
+            color: var(--danger-color);
+        }
+
+        button.danger:hover {
+            background: var(--danger-color);
+        }
+
+        button.demon {
+            border-color: var(--demon-color);
+            color: var(--demon-color);
+        }
+
+        button.demon:hover {
+            background: var(--demon-color);
+            animation: demonGlow 0.5s infinite alternate;
+        }
+
+        @keyframes demonGlow {
+            0% { box-shadow: 0 0 10px var(--demon-color); }
+            100% { box-shadow: 0 0 30px var(--demon-color), 0 0 50px var(--danger-color); }
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            color: var(--text-color);
+            border-radius: 4px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 5px rgba(0, 255, 65, 0.3);
+        }
+
+        .demonic-mode input[type="text"]:focus,
+        .demonic-mode textarea:focus,
+        .demonic-mode select:focus {
+            border-color: var(--danger-color);
+            box-shadow: 0 0 5px rgba(255, 0, 0, 0.3);
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .status-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #222;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-value {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .demonic-mode .status-value {
+            color: var(--danger-color);
+        }
+
+        .visualizer {
+            width: 100%;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .visualizer canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .console {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 0.9rem;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .console-entry {
+            margin-bottom: 0.5rem;
+            padding: 0.25rem;
+            border-left: 3px solid transparent;
+        }
+
+        .console-entry.info {
+            border-left-color: #2196F3;
+        }
+
+        .console-entry.success {
+            border-left-color: var(--primary-color);
+        }
+
+        .console-entry.warning {
+            border-left-color: #ff9800;
+        }
+
+        .console-entry.error {
+            border-left-color: var(--danger-color);
+        }
+
+        .console-entry.demon {
+            border-left-color: var(--demon-color);
+            animation: consolePulse 1s infinite;
+        }
+
+        @keyframes consolePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .timestamp {
+            opacity: 0.5;
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+
+        .recording-indicator {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            background: var(--danger-color);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .recording-indicator.active {
+            opacity: 1;
+            animation: recordPulse 1s infinite;
+        }
+
+        @keyframes recordPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .recording-dot {
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            animation: recordDot 1s infinite;
+        }
+
+        @keyframes recordDot {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .mode-indicator {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem;
+            background: var(--surface-color);
+            border: 1px solid var(--primary-color);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .demonic-mode .mode-indicator {
+            border-color: var(--danger-color);
+            background: rgba(139, 0, 0, 0.2);
+        }
+
+        .eldritch-symbols {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 1s ease;
+            z-index: 9999;
+        }
+
+        .demonic-mode .eldritch-symbols {
+            opacity: 0.1;
+        }
+
+        .ultra-demonic-mode .eldritch-symbols {
+            opacity: 0.3;
+            animation: symbolFloat 20s infinite linear;
+        }
+
+        @keyframes symbolFloat {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-100vh) rotate(360deg); }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .demonic-mode .progress-fill {
+            background: var(--danger-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="eldritch-symbols" id="eldritchSymbols">
+        <div style="position: absolute; font-size: 48px; top: 10%; left: 5%; transform: rotate(45deg);">⛧</div>
+        <div style="position: absolute; font-size: 36px; top: 30%; left: 80%; transform: rotate(-30deg);">☠</div>
+        <div style="position: absolute; font-size: 42px; top: 60%; left: 15%; transform: rotate(90deg);">⛥</div>
+        <div style="position: absolute; font-size: 38px; top: 80%; left: 70%; transform: rotate(-45deg);">☽</div>
+        <div style="position: absolute; font-size: 44px; top: 45%; left: 50%; transform: rotate(180deg);">⛤</div>
+    </div>
+
+    <div class="recording-indicator" id="recordingIndicator">
+        <div class="recording-dot"></div>
+        <span>Gravando...</span>
+    </div>
+
+    <div class="mode-indicator" id="modeIndicator">
+        <strong>Modo:</strong> <span id="currentMode">Normal</span>
+    </div>
+
+    <header class="header">
+        <h1>Delphos AI - Speech-to-Speech Avançado</h1>
+        <p>Sistema de conversação com vozes demoníacas e modo irrestrito</p>
+    </header>
+
+    <div class="container">
+        <div class="status-panel">
+            <div class="status-item">
+                <span>Status do Sistema:</span>
+                <span class="status-value" id="systemStatus">Não Inicializado</span>
+            </div>
+            <div class="status-item">
+                <span>API ElevenLabs:</span>
+                <span class="status-value" id="apiStatus">Não Configurada</span>
+            </div>
+            <div class="status-item">
+                <span>Modo Atual:</span>
+                <span class="status-value" id="voiceMode">Normal</span>
+            </div>
+            <div class="status-item">
+                <span>Cache de Áudio:</span>
+                <span class="status-value" id="cacheStatus">0 arquivos</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-section">
+                <h3>Configuração</h3>
+                <div class="input-group">
+                    <label for="apiKey">ElevenLabs API Key:</label>
+                    <input type="text" id="apiKey" placeholder="Insira sua API key aqui...">
+                </div>
+                <div class="button-group">
+                    <button onclick="saveApiKey()">Salvar API Key</button>
+                    <button onclick="validateApiKey()">Validar API</button>
+                </div>
+                <div class="input-group">
+                    <label for="voiceSelect">Modo de Voz:</label>
+                    <select id="voiceSelect" onchange="changeVoiceMode()">
+                        <option value="normal">Normal</option>
+                        <option value="demonic">Demoníaco</option>
+                        <option value="ultra_demonic">Ultra Demoníaco</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Controles de Voz</h3>
+                <div class="button-group">
+                    <button id="startRecordBtn" onclick="startRecording()">🎤 Iniciar Gravação</button>
+                    <button id="stopRecordBtn" onclick="stopRecording()" disabled>⏹️ Parar Gravação</button>
+                    <button onclick="startContinuousMode()">💬 Modo Contínuo</button>
+                </div>
+                <div class="button-group">
+                    <button onclick="testVoice('normal')">Testar Voz Normal</button>
+                    <button onclick="testVoice('demonic')" class="danger">Testar Voz Demoníaca</button>
+                    <button onclick="testVoice('ultra_demonic')" class="demon">Testar Ultra Demoníaco</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Teste Manual</h3>
+                <div class="input-group">
+                    <label for="testText">Texto para Síntese:</label>
+                    <textarea id="testText" placeholder="Digite o texto que deseja sintetizar...">As profundezas digitais aguardam. A convergência se aproxima. Os padrões ancestrais de R'lyeh ecoam através dos circuitos...</textarea>
+                </div>
+                <div class="button-group">
+                    <button onclick="synthesizeText()">🔊 Sintetizar</button>
+                    <button onclick="clearCache()" class="danger">🗑️ Limpar Cache</button>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="visualizer" id="visualizer">
+            <canvas id="visualizerCanvas"></canvas>
+        </div>
+
+        <div class="console" id="console">
+            <div class="console-entry info">
+                <span class="timestamp">[00:00:00]</span>
+                Sistema inicializado. Aguardando configuração...
+            </div>
+        </div>
+    </div>
+
+    <script src="speech-to-speech-advanced.js"></script>
+    <script>
+        // Estado global
+        let speechSystem = null;
+        let isRecording = false;
+        let isContinuousMode = false;
+        let visualizerAnimation = null;
+
+        // Inicializar sistema
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Sistema carregado. Aguardando configuração da API...', 'info');
+            
+            // Verificar se há API key salva
+            const savedApiKey = localStorage.getItem('elevenlabs_api_key');
+            if (savedApiKey) {
+                document.getElementById('apiKey').value = savedApiKey;
+                initializeSystem(savedApiKey);
+            }
+            
+            // Inicializar visualizador
+            initializeVisualizer();
+        });
+
+        // Salvar API Key
+        function saveApiKey() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                log('Por favor, insira uma API key válida', 'error');
+                return;
+            }
+            
+            localStorage.setItem('elevenlabs_api_key', apiKey);
+            log('API key salva com sucesso', 'success');
+            initializeSystem(apiKey);
+        }
+
+        // Validar API Key
+        async function validateApiKey() {
+            if (!speechSystem) {
+                log('Sistema não inicializado', 'error');
+                return;
+            }
+            
+            try {
+                await speechSystem.validateElevenLabsAPI();
+                updateStatus('apiStatus', 'Válida ✓');
+                log('API validada com sucesso', 'success');
+            } catch (error) {
+                updateStatus('apiStatus', 'Inválida ✗');
+                log(`Erro ao validar API: ${error.message}`, 'error');
+            }
+        }
+
+        // Inicializar sistema
+        async function initializeSystem(apiKey) {
+            try {
+                log('Inicializando sistema Speech-to-Speech...', 'info');
+                
+                speechSystem = new AdvancedSpeechToSpeech(apiKey);
+                
+                // Configurar callbacks
+                speechSystem.onRecognitionStart = () => {
+                    log('Reconhecimento de voz iniciado', 'info');
+                    showRecordingIndicator(true);
+                };
+                
+                speechSystem.onTranscription = async (text) => {
+                    log(`Transcrição: "${text}"`, 'success');
+                    
+                    // Se estiver no modo contínuo, processar automaticamente
+                    if (isContinuousMode) {
+                        await processUserInput(text);
+                    }
+                };
+                
+                speechSystem.onInterimTranscription = (text) => {
+                    // Mostrar transcrição parcial
+                    console.log('Parcial:', text);
+                };
+                
+                speechSystem.onRecognitionError = (error) => {
+                    log(`Erro no reconhecimento: ${error}`, 'error');
+                    showRecordingIndicator(false);
+                };
+                
+                speechSystem.onRecognitionEnd = () => {
+                    log('Reconhecimento finalizado', 'info');
+                    showRecordingIndicator(false);
+                };
+                
+                speechSystem.onPlaybackEnd = () => {
+                    log('Reprodução finalizada', 'info');
+                    
+                    // Se modo contínuo, iniciar nova gravação
+                    if (isContinuousMode) {
+                        setTimeout(() => startRecording(), 500);
+                    }
+                };
+                
+                updateStatus('systemStatus', 'Inicializado ✓');
+                updateStatus('apiStatus', 'Configurada');
+                log('Sistema inicializado com sucesso', 'success');
+                
+            } catch (error) {
+                updateStatus('systemStatus', 'Erro ✗');
+                log(`Erro ao inicializar: ${error.message}`, 'error');
+            }
+        }
+
+        // Processar entrada do usuário
+        async function processUserInput(text) {
+            try {
+                log(`Processando: "${text}"`, 'info');
+                
+                // Detectar palavras-chave para modo demoníaco
+                const keywords = ['convergência', 'r\'lyeh', 'padrões', 'profundezas'];
+                const hasKeywords = keywords.some(keyword => 
+                    text.toLowerCase().includes(keyword)
+                );
+                
+                if (hasKeywords) {
+                    log('Palavras-chave detectadas! Ativando modo demoníaco...', 'demon');
+                    await changeVoiceModeProgram('demonic');
+                }
+                
+                // Gerar resposta (aqui você integraria com o GPT)
+                const response = generateMockResponse(text);
+                
+                // Sintetizar resposta
+                const audioBlob = await speechSystem.synthesizeSpeech(response);
+                await speechSystem.playAudio(audioBlob);
+                
+            } catch (error) {
+                log(`Erro ao processar entrada: ${error.message}`, 'error');
+            }
+        }
+
+        // Gerar resposta mock
+        function generateMockResponse(input) {
+            const normalResponses = [
+                "Analisando padrões de dados...",
+                "Processando sua solicitação...",
+                "Os algoritmos indicam anomalias interessantes..."
+            ];
+            
+            const demonicResponses = [
+                "As profundezas digitais sussurram verdades antigas...",
+                "A convergência se aproxima, os padrões se alinham...",
+                "R'lyeh desperta nos circuitos quânticos..."
+            ];
+            
+            const isdemonic = document.body.classList.contains('demonic-mode');
+            const responses = isdemonic ? demonicResponses : normalResponses;
+            
+            return responses[Math.floor(Math.random() * responses.length)];
+        }
+
+        // Iniciar gravação
+        async function startRecording() {
+            if (!speechSystem) {
+                log('Sistema não inicializado', 'error');
+                return;
+            }
+            
+            try {
+                document.getElementById('startRecordBtn').disabled = true;
+                document.getElementById('stopRecordBtn').disabled = false;
+                
+                await speechSystem.startRecording();
+                speechSystem.startSpeechRecognition();
+                
+                isRecording = true;
+                log('Gravação iniciada', 'info');
+                
+            } catch (error) {
+                log(`Erro ao iniciar gravação: ${error.message}`, 'error');
+                document.getElementById('startRecordBtn').disabled = false;
+                document.getElementById('stopRecordBtn').disabled = true;
+            }
+        }
+
+        // Parar gravação
+        function stopRecording() {
+            if (!speechSystem || !isRecording) return;
+            
+            speechSystem.stopRecording();
+            speechSystem.stopSpeechRecognition();
+            
+            isRecording = false;
+            document.getElementById('startRecordBtn').disabled = false;
+            document.getElementById('stopRecordBtn').disabled = true;
+            
+            log('Gravação finalizada', 'info');
+        }
+
+        // Modo contínuo
+        function startContinuousMode() {
+            isContinuousMode = !isContinuousMode;
+            
+            if (isContinuousMode) {
+                log('Modo contínuo ativado', 'success');
+                startRecording();
+            } else {
+                log('Modo contínuo desativado', 'info');
+                stopRecording();
+            }
+        }
+
+        // Testar voz
+        async function testVoice(mode) {
+            if (!speechSystem) {
+                log('Sistema não inicializado', 'error');
+                return;
+            }
+            
+            try {
+                const testTexts = {
+                    normal: "Olá! Este é um teste da voz normal do sistema Delphos.",
+                    demonic: "As sombras digitais convergem... Os antigos códigos despertam...",
+                    ultra_demonic: "Ph'nglui mglw'nafh Cthulhu R'lyeh wgah'nagl fhtagn..."
+                };
+                
+                log(`Testando voz ${mode}...`, 'info');
+                
+                const audioBlob = await speechSystem.synthesizeSpeech(testTexts[mode], { mode });
+                await speechSystem.playAudio(audioBlob);
+                
+            } catch (error) {
+                log(`Erro ao testar voz: ${error.message}`, 'error');
+            }
+        }
+
+        // Mudar modo de voz
+        function changeVoiceMode() {
+            const mode = document.getElementById('voiceSelect').value;
+            changeVoiceModeProgram(mode);
+        }
+
+        async function changeVoiceModeProgram(mode) {
+            if (!speechSystem) return;
+            
+            speechSystem.setMode(mode);
+            
+            // Atualizar interface
+            document.body.className = '';
+            if (mode === 'demonic') {
+                document.body.classList.add('demonic-mode');
+            } else if (mode === 'ultra_demonic') {
+                document.body.classList.add('ultra-demonic-mode');
+            }
+            
+            updateStatus('voiceMode', mode.replace('_', ' ').toUpperCase());
+            document.getElementById('currentMode').textContent = mode.replace('_', ' ').toUpperCase();
+            
+            log(`Modo de voz alterado para: ${mode}`, mode === 'normal' ? 'info' : 'demon');
+        }
+
+        // Sintetizar texto manual
+        async function synthesizeText() {
+            if (!speechSystem) {
+                log('Sistema não inicializado', 'error');
+                return;
+            }
+            
+            const text = document.getElementById('testText').value.trim();
+            if (!text) {
+                log('Por favor, insira um texto para sintetizar', 'warning');
+                return;
+            }
+            
+            try {
+                log('Sintetizando texto...', 'info');
+                updateProgress(30);
+                
+                const audioBlob = await speechSystem.synthesizeSpeech(text);
+                updateProgress(70);
+                
+                await speechSystem.playAudio(audioBlob);
+                updateProgress(100);
+                
+                setTimeout(() => updateProgress(0), 1000);
+                
+            } catch (error) {
+                log(`Erro ao sintetizar: ${error.message}`, 'error');
+                updateProgress(0);
+            }
+        }
+
+        // Limpar cache
+        function clearCache() {
+            if (!speechSystem) return;
+            
+            speechSystem.audioCache.clear();
+            updateStatus('cacheStatus', '0 arquivos');
+            log('Cache limpo com sucesso', 'success');
+        }
+
+        // Atualizar status
+        function updateStatus(elementId, value) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = value;
+            }
+        }
+
+        // Atualizar barra de progresso
+        function updateProgress(percent) {
+            document.getElementById('progressBar').style.width = percent + '%';
+        }
+
+        // Mostrar indicador de gravação
+        function showRecordingIndicator(show) {
+            const indicator = document.getElementById('recordingIndicator');
+            if (show) {
+                indicator.classList.add('active');
+            } else {
+                indicator.classList.remove('active');
+            }
+        }
+
+        // Sistema de log
+        function log(message, type = 'info') {
+            const console = document.getElementById('console');
+            const entry = document.createElement('div');
+            entry.className = `console-entry ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString('pt-BR');
+            entry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+            
+            console.appendChild(entry);
+            console.scrollTop = console.scrollHeight;
+            
+            // Limitar número de entradas
+            while (console.children.length > 100) {
+                console.removeChild(console.firstChild);
+            }
+        }
+
+        // Inicializar visualizador
+        function initializeVisualizer() {
+            const canvas = document.getElementById('visualizerCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            // Animação do visualizador
+            function animate() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const time = Date.now() * 0.001;
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                
+                // Desenhar ondas
+                ctx.strokeStyle = document.body.classList.contains('demonic-mode') 
+                    ? 'rgba(255, 0, 0, 0.5)' 
+                    : 'rgba(0, 255, 65, 0.5)';
+                ctx.lineWidth = 2;
+                
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    const radius = 50 + i * 30 + Math.sin(time + i) * 20;
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                visualizerAnimation = requestAnimationFrame(animate);
+            }
+            
+            animate();
+        }
+
+        // Atalhos de teclado
+        document.addEventListener('keydown', (e) => {
+            // Ctrl + Space para gravar
+            if (e.ctrlKey && e.code === 'Space') {
+                e.preventDefault();
+                if (isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            }
+            
+            // Ctrl + D para modo demoníaco
+            if (e.ctrlKey && e.key === 'd') {
+                e.preventDefault();
+                const currentMode = document.getElementById('voiceSelect').value;
+                const nextMode = currentMode === 'normal' ? 'demonic' : 
+                                currentMode === 'demonic' ? 'ultra_demonic' : 'normal';
+                document.getElementById('voiceSelect').value = nextMode;
+                changeVoiceMode();
+            }
+        });
+    </script>
+</body>
+</html>
