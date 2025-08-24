@@ -84,6 +84,16 @@ class ElevenLabsEnhanced {
         }
     }
     
+    // Adicionar método para parar áudio
+    stopAudio() {
+        const audioElements = document.querySelectorAll('audio');
+        audioElements.forEach(audio => {
+            audio.pause();
+            audio.remove();
+        });
+        console.log('🛑 Áudio do Eleven Labs parado');
+    }
+    
     // Text-to-Speech aprimorado
     async textToSpeech(text, options = {}) {
         const {
