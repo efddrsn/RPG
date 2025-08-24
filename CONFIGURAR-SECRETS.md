@@ -48,6 +48,10 @@ localStorage.setItem('elevenlabs_api_key', 'sua-chave-aqui');
 
 ## Troubleshooting
 
+### Logs do GitHub Actions
+
+**Importante**: O GitHub mascara automaticamente os valores dos secrets nos logs. Se você vir `***` nos logs, isso é normal e indica que o secret foi reconhecido e está sendo protegido. O workflow agora mostra o número de caracteres do secret para confirmar que foi carregado corretamente.
+
 ### Erro: "Placeholders não foram substituídos completamente"
 
 Este erro indica que os secrets não foram configurados corretamente no GitHub. Verifique:
