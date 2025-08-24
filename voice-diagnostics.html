@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico de Voz - Delphos AI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button.danger {
+            background: #f44336;
+        }
+        button.danger:hover {
+            background: #da190b;
+        }
+        .log {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .control-group {
+            margin: 10px 0;
+        }
+        label {
+            display: inline-block;
+            width: 150px;
+            font-weight: bold;
+        }
+        input[type="range"] {
+            width: 200px;
+        }
+        .value-display {
+            display: inline-block;
+            width: 50px;
+            text-align: center;
+        }
+        .voice-info {
+            background: #e3f2fd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .status {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .status.success {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        .status.error {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+        .status.warning {
+            background: #fff9c4;
+            color: #f57c00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔊 Diagnóstico de Voz - Delphos AI</h1>
+        
+        <div class="section">
+            <h2>Estado do Sistema</h2>
+            <div id="system-status">
+                <p>Verificando suporte do navegador...</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Vozes Disponíveis</h2>
+            <div id="voices-list">
+                <p>Carregando vozes...</p>
+            </div>
+            <button onclick="loadVoices()">Recarregar Vozes</button>
+        </div>
+
+        <div class="section">
+            <h2>Teste de TTS Nativo</h2>
+            <div class="control-group">
+                <label>Volume:</label>
+                <input type="range" id="volume" min="0" max="1" step="0.1" value="1.0" onchange="updateValue('volume')">
+                <span class="value-display" id="volume-value">1.0</span>
+            </div>
+            <div class="control-group">
+                <label>Tom (Pitch):</label>
+                <input type="range" id="pitch" min="0.1" max="2" step="0.1" value="1.0" onchange="updateValue('pitch')">
+                <span class="value-display" id="pitch-value">1.0</span>
+            </div>
+            <div class="control-group">
+                <label>Velocidade:</label>
+                <input type="range" id="rate" min="0.1" max="2" step="0.1" value="1.0" onchange="updateValue('rate')">
+                <span class="value-display" id="rate-value">1.0</span>
+            </div>
+            <div class="control-group">
+                <label>Voz:</label>
+                <select id="voice-select">
+                    <option value="">Padrão do Sistema</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Texto:</label>
+                <input type="text" id="test-text" value="Olá, este é um teste do sistema de voz da Delphos" style="width: 100%; padding: 5px;">
+            </div>
+            <button onclick="testNativeVoice()">Testar Voz Normal</button>
+            <button onclick="testDemonicVoice()" class="danger">Testar Voz Demoníaca</button>
+            <button onclick="stopSpeaking()">Parar</button>
+        </div>
+
+        <div class="section">
+            <h2>Teste de Volume do Sistema</h2>
+            <button onclick="playTestTone()">Tocar Tom de Teste (440Hz)</button>
+            <button onclick="checkAudioContext()">Verificar AudioContext</button>
+            <div id="audio-info"></div>
+        </div>
+
+        <div class="section">
+            <h2>Logs de Diagnóstico</h2>
+            <button onclick="clearLogs()">Limpar Logs</button>
+            <div class="log" id="diagnostic-log"></div>
+        </div>
+    </div>
+
+    <script>
+        let synthesis = window.speechSynthesis;
+        let voices = [];
+        let audioContext = null;
+        
+        // Funções de log
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('diagnostic-log');
+            const time = new Date().toLocaleTimeString();
+            const typeEmoji = {
+                'info': 'ℹ️',
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️'
+            };
+            logDiv.innerHTML += `<div>[${time}] ${typeEmoji[type]} ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Verificar suporte do sistema
+        function checkSystemSupport() {
+            const statusDiv = document.getElementById('system-status');
+            let html = '';
+            
+            // Verificar Speech Synthesis
+            if ('speechSynthesis' in window) {
+                html += '<p class="status success">✅ Speech Synthesis suportado</p>';
+                log('Speech Synthesis está disponível', 'success');
+            } else {
+                html += '<p class="status error">❌ Speech Synthesis não suportado</p>';
+                log('Speech Synthesis NÃO está disponível', 'error');
+            }
+            
+            // Verificar Speech Recognition
+            if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+                html += '<p class="status success">✅ Speech Recognition suportado</p>';
+                log('Speech Recognition está disponível', 'success');
+            } else {
+                html += '<p class="status warning">⚠️ Speech Recognition não suportado</p>';
+                log('Speech Recognition NÃO está disponível', 'warning');
+            }
+            
+            // Verificar AudioContext
+            if ('AudioContext' in window || 'webkitAudioContext' in window) {
+                html += '<p class="status success">✅ Web Audio API suportada</p>';
+                log('Web Audio API está disponível', 'success');
+            } else {
+                html += '<p class="status error">❌ Web Audio API não suportada</p>';
+                log('Web Audio API NÃO está disponível', 'error');
+            }
+            
+            // Verificar HTTPS
+            if (location.protocol === 'https:' || location.hostname === 'localhost') {
+                html += '<p class="status success">✅ Contexto seguro (HTTPS/localhost)</p>';
+                log('Rodando em contexto seguro', 'success');
+            } else {
+                html += '<p class="status warning">⚠️ Não está em HTTPS (algumas funcionalidades podem não funcionar)</p>';
+                log('NÃO está em contexto seguro', 'warning');
+            }
+            
+            statusDiv.innerHTML = html;
+        }
+
+        // Carregar vozes disponíveis
+        function loadVoices() {
+            voices = synthesis.getVoices();
+            const voicesDiv = document.getElementById('voices-list');
+            const voiceSelect = document.getElementById('voice-select');
+            
+            if (voices.length === 0) {
+                voicesDiv.innerHTML = '<p class="status warning">⚠️ Nenhuma voz encontrada. Tentando novamente...</p>';
+                log('Nenhuma voz encontrada, tentando novamente...', 'warning');
+                setTimeout(loadVoices, 1000);
+                return;
+            }
+            
+            let html = `<p class="status success">✅ ${voices.length} vozes encontradas</p>`;
+            log(`${voices.length} vozes carregadas`, 'success');
+            
+            // Limpar select
+            voiceSelect.innerHTML = '<option value="">Padrão do Sistema</option>';
+            
+            // Categorizar vozes
+            const ptBRVoices = voices.filter(v => v.lang.includes('pt-BR'));
+            const ptVoices = voices.filter(v => v.lang.includes('pt') && !v.lang.includes('pt-BR'));
+            const otherVoices = voices.filter(v => !v.lang.includes('pt'));
+            
+            html += '<div class="voice-info"><h3>Vozes em Português (Brasil)</h3>';
+            if (ptBRVoices.length > 0) {
+                ptBRVoices.forEach((voice, index) => {
+                    html += `<p>${index + 1}. <strong>${voice.name}</strong> (${voice.lang}) ${voice.default ? '⭐ Padrão' : ''}</p>`;
+                    voiceSelect.innerHTML += `<option value="${voices.indexOf(voice)}">PT-BR: ${voice.name}</option>`;
+                    log(`Voz PT-BR encontrada: ${voice.name}`, 'info');
+                });
+            } else {
+                html += '<p>Nenhuma voz PT-BR encontrada</p>';
+            }
+            html += '</div>';
+            
+            if (ptVoices.length > 0) {
+                html += '<div class="voice-info"><h3>Outras vozes em Português</h3>';
+                ptVoices.forEach((voice) => {
+                    html += `<p><strong>${voice.name}</strong> (${voice.lang})</p>`;
+                    voiceSelect.innerHTML += `<option value="${voices.indexOf(voice)}">PT: ${voice.name}</option>`;
+                });
+                html += '</div>';
+            }
+            
+            voicesDiv.innerHTML = html;
+        }
+
+        // Atualizar valores dos controles
+        function updateValue(control) {
+            const value = document.getElementById(control).value;
+            document.getElementById(control + '-value').textContent = value;
+        }
+
+        // Testar voz normal
+        function testNativeVoice() {
+            const text = document.getElementById('test-text').value;
+            const volume = parseFloat(document.getElementById('volume').value);
+            const pitch = parseFloat(document.getElementById('pitch').value);
+            const rate = parseFloat(document.getElementById('rate').value);
+            const voiceIndex = document.getElementById('voice-select').value;
+            
+            log(`Testando voz normal - Volume: ${volume}, Pitch: ${pitch}, Rate: ${rate}`, 'info');
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.volume = volume;
+            utterance.pitch = pitch;
+            utterance.rate = rate;
+            utterance.lang = 'pt-BR';
+            
+            if (voiceIndex && voices[voiceIndex]) {
+                utterance.voice = voices[voiceIndex];
+                log(`Usando voz: ${voices[voiceIndex].name}`, 'info');
+            }
+            
+            utterance.onstart = () => {
+                log('Iniciando fala...', 'success');
+            };
+            
+            utterance.onend = () => {
+                log('Fala concluída', 'success');
+            };
+            
+            utterance.onerror = (event) => {
+                log(`Erro na fala: ${event.error}`, 'error');
+            };
+            
+            // Cancelar falas anteriores
+            synthesis.cancel();
+            
+            // Pequeno delay para garantir que o cancel foi processado
+            setTimeout(() => {
+                synthesis.speak(utterance);
+                log('Utterance adicionada à fila', 'info');
+            }, 100);
+        }
+
+        // Testar voz demoníaca
+        function testDemonicVoice() {
+            const text = document.getElementById('test-text').value;
+            
+            log('Testando voz demoníaca com configurações especiais', 'info');
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.volume = 1.0;
+            utterance.pitch = 0.3;  // Tom grave
+            utterance.rate = 0.8;   // Mais lento
+            utterance.lang = 'pt-BR';
+            
+            // Tentar encontrar uma voz masculina
+            const maleVoice = voices.find(v => 
+                v.lang.includes('pt-BR') && 
+                (v.name.toLowerCase().includes('male') || 
+                 v.name.toLowerCase().includes('masculino'))
+            );
+            
+            if (maleVoice) {
+                utterance.voice = maleVoice;
+                log(`Usando voz masculina: ${maleVoice.name}`, 'info');
+            }
+            
+            utterance.onstart = () => {
+                log('Iniciando fala demoníaca...', 'success');
+            };
+            
+            utterance.onend = () => {
+                log('Fala demoníaca concluída', 'success');
+            };
+            
+            utterance.onerror = (event) => {
+                log(`Erro na fala demoníaca: ${event.error}`, 'error');
+            };
+            
+            synthesis.cancel();
+            setTimeout(() => {
+                synthesis.speak(utterance);
+            }, 100);
+        }
+
+        // Parar fala
+        function stopSpeaking() {
+            synthesis.cancel();
+            log('Fala cancelada', 'info');
+        }
+
+        // Tocar tom de teste
+        function playTestTone() {
+            try {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                log('Tocando tom de 440Hz por 1 segundo', 'info');
+                
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 440;
+                gainNode.gain.value = 0.3;
+                
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 1);
+                
+                log('Tom de teste iniciado', 'success');
+            } catch (error) {
+                log(`Erro ao tocar tom: ${error.message}`, 'error');
+            }
+        }
+
+        // Verificar AudioContext
+        function checkAudioContext() {
+            const infoDiv = document.getElementById('audio-info');
+            
+            try {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                const info = `
+                    <div class="voice-info">
+                        <p><strong>Estado:</strong> ${audioContext.state}</p>
+                        <p><strong>Taxa de amostragem:</strong> ${audioContext.sampleRate} Hz</p>
+                        <p><strong>Tempo atual:</strong> ${audioContext.currentTime.toFixed(2)} segundos</p>
+                        <p><strong>Latência de saída:</strong> ${audioContext.outputLatency ? audioContext.outputLatency.toFixed(3) : 'N/A'} segundos</p>
+                    </div>
+                `;
+                infoDiv.innerHTML = info;
+                log('AudioContext verificado com sucesso', 'success');
+            } catch (error) {
+                infoDiv.innerHTML = `<p class="status error">Erro: ${error.message}</p>`;
+                log(`Erro ao verificar AudioContext: ${error.message}`, 'error');
+            }
+        }
+
+        // Limpar logs
+        function clearLogs() {
+            document.getElementById('diagnostic-log').innerHTML = '';
+            log('Logs limpos', 'info');
+        }
+
+        // Inicializar
+        window.onload = function() {
+            checkSystemSupport();
+            
+            // Tentar carregar vozes
+            loadVoices();
+            
+            // Evento para quando vozes mudarem
+            if (synthesis.onvoiceschanged !== undefined) {
+                synthesis.onvoiceschanged = loadVoices;
+            }
+            
+            // Log de informações do navegador
+            log(`Navegador: ${navigator.userAgent}`, 'info');
+            log(`Plataforma: ${navigator.platform}`, 'info');
+            log(`Idioma: ${navigator.language}`, 'info');
+        };
+    </script>
+</body>
+</html>
