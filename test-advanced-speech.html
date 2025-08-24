@@ -440,6 +440,14 @@
                 <span class="status-value" id="systemStatus">Não Inicializado</span>
             </div>
             <div class="status-item">
+                <span>Contexto Seguro (HTTPS):</span>
+                <span class="status-value" id="secureContextStatus">Verificando...</span>
+            </div>
+            <div class="status-item">
+                <span>Permissão do Microfone:</span>
+                <span class="status-value" id="micPermissionStatus">Não Verificado</span>
+            </div>
+            <div class="status-item">
                 <span>API ElevenLabs:</span>
                 <span class="status-value" id="apiStatus">Não Configurada</span>
             </div>
@@ -448,9 +456,19 @@
                 <span class="status-value" id="voiceMode">Normal</span>
             </div>
             <div class="status-item">
-                <span>Cache de Áudio:</span>
-                <span class="status-value" id="cacheStatus">0 arquivos</span>
+                <span>Reconhecimento de Voz:</span>
+                <span class="status-value" id="recognitionStatus">Inativo</span>
             </div>
+        </div>
+
+        <div class="control-group">
+            <h3>Configuração Inicial</h3>
+            <button class="btn" id="requestPermission">
+                🎤 Solicitar Permissão do Microfone
+            </button>
+            <button class="btn" id="checkSystemStatus">
+                🔍 Verificar Status do Sistema
+            </button>
         </div>
 
         <div class="controls">
@@ -537,6 +555,72 @@
             
             // Inicializar visualizador
             initializeVisualizer();
+        });
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Verificar contexto seguro imediatamente
+            const isSecure = window.isSecureContext || 
+                           window.location.hostname === 'localhost' || 
+                           window.location.hostname === '127.0.0.1' ||
+                           window.location.protocol === 'https:';
+            
+            updateStatus('secureContextStatus', isSecure ? 'Seguro ✓' : 'Não Seguro ✗');
+            
+            if (!isSecure) {
+                log('⚠️ AVISO: O site não está em contexto seguro (HTTPS). O microfone pode não funcionar.', 'error');
+            }
+            
+            // Solicitar permissão do microfone
+            document.getElementById('requestPermission').addEventListener('click', async () => {
+                try {
+                    log('Solicitando permissão do microfone...', 'info');
+                    
+                    if (!speechSystem) {
+                        log('Sistema não inicializado. Configure a API Key primeiro.', 'error');
+                        return;
+                    }
+                    
+                    const granted = await speechSystem.requestMicrophonePermission();
+                    
+                    if (granted) {
+                        updateStatus('micPermissionStatus', 'Permitido ✓');
+                        log('✅ Permissão do microfone concedida!', 'success');
+                    } else {
+                        updateStatus('micPermissionStatus', 'Negado ✗');
+                        log('❌ Permissão do microfone negada. Verifique as configurações do navegador.', 'error');
+                    }
+                } catch (error) {
+                    log(`Erro ao solicitar permissão: ${error.message}`, 'error');
+                }
+            });
+            
+            // Verificar status do sistema
+            document.getElementById('checkSystemStatus').addEventListener('click', async () => {
+                try {
+                    if (!speechSystem) {
+                        log('Sistema não inicializado. Configure a API Key primeiro.', 'error');
+                        return;
+                    }
+                    
+                    log('Verificando status do sistema...', 'info');
+                    const status = await speechSystem.getSystemStatus();
+                    
+                    // Atualizar UI com status
+                    updateStatus('secureContextStatus', status.secureContext ? 'Seguro ✓' : 'Não Seguro ✗');
+                    updateStatus('micPermissionStatus', 
+                        status.microphonePermission === 'granted' ? 'Permitido ✓' : 
+                        status.microphonePermission === 'denied' ? 'Negado ✗' : 
+                        'Não Verificado');
+                    updateStatus('apiStatus', status.elevenLabsConnected ? 'Conectada ✓' : 'Desconectada ✗');
+                    
+                    log('Status do sistema atualizado', 'success');
+                    console.log('Status completo:', status);
+                } catch (error) {
+                    log(`Erro ao verificar status: ${error.message}`, 'error');
+                }
+            });
+            
         });
 
         // Salvar API Key
@@ -630,6 +714,21 @@
             try {
                 log(`Processando: "${text}"`, 'info');
                 
+                // Verificar se o sistema está pronto
+                const status = await speechSystem.getSystemStatus();
+                
+                if (!status.initialized) {
+                    throw new Error('Sistema não inicializado. Configure a API Key primeiro.');
+                }
+                
+                if (status.microphonePermission === 'denied') {
+                    throw new Error('Permissão do microfone negada. Clique em "Solicitar Permissão do Microfone" e permita o acesso.');
+                }
+                
+                if (!status.elevenLabsConnected) {
+                    log('⚠️ ElevenLabs não conectada. Usando TTS nativo como fallback.', 'warning');
+                }
+                
                 // Detectar palavras-chave para modo demoníaco
                 const keywords = ['convergência', 'r\'lyeh', 'padrões', 'profundezas'];
                 const hasKeywords = keywords.some(keyword => 
@@ -649,7 +748,28 @@
                 await speechSystem.playAudio(audioBlob);
                 
             } catch (error) {
-                log(`Erro ao processar entrada: ${error.message}`, 'error');
+                // Mensagens de erro mais amigáveis
+                let userMessage = error.message;
+                
+                if (error.message.includes('not allowed by the user agent')) {
+                    userMessage = '🎤 Acesso ao microfone bloqueado. Por favor:\n' +
+                                '1. Clique no ícone de cadeado na barra de endereço\n' +
+                                '2. Permita o acesso ao microfone para este site\n' +
+                                '3. Recarregue a página';
+                } else if (error.message.includes('no speech input')) {
+                    userMessage = '🔇 Nenhuma fala detectada. Tente falar mais próximo do microfone.';
+                } else if (error.message.includes('network')) {
+                    userMessage = '🌐 Erro de conexão. Verifique sua internet e tente novamente.';
+                } else if (error.message.includes('API key')) {
+                    userMessage = '🔑 Problema com a API Key da ElevenLabs. Verifique se está correta.';
+                }
+                
+                log(`Erro: ${userMessage}`, 'error');
+                
+                // Mostrar dica adicional para erros de permissão
+                if (error.message.includes('permission') || error.message.includes('not allowed')) {
+                    log('💡 Dica: Use o botão "Solicitar Permissão do Microfone" antes de começar.', 'info');
+                }
             }
         }
 
