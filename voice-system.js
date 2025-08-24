@@ -474,7 +474,8 @@ class DelphosVoiceSystem {
                     console.log('🔊 Iniciando fala' + (isUnrestricted ? ' (modo demoníaco)' : '') + '...');
                 };
                 
-                utterance.onend = () => {
+                // Criar uma nova variável para o callback original
+                const originalOnEnd = () => {
                     this.isSpeaking = false;
                     this.updateUI('idle');
                     console.log('✅ Fala concluída');
@@ -485,6 +486,8 @@ class DelphosVoiceSystem {
                         setTimeout(() => this.startListening(), 500);
                     }
                 };
+                
+                utterance.onend = originalOnEnd;
                 
                 utterance.onerror = (event) => {
                     console.error('❌ Erro na síntese:', event.error, event);
@@ -532,29 +535,42 @@ class DelphosVoiceSystem {
         const utterance = this.utteranceQueue.shift();
         
         // Garantir que o speechSynthesis esteja pronto
-        // REMOVIDO: cancelamento automático que estava causando problemas
-        // if (this.speechSynthesis.speaking || this.speechSynthesis.pending) {
-        //     this.speechSynthesis.cancel();
-        // }
+        // Verificar se já há algo falando ou pendente
+        if (this.speechSynthesis.speaking || this.speechSynthesis.pending) {
+            console.log('⚠️ Síntese ocupada, aguardando...');
+            // Recolocar na fila e tentar novamente
+            this.utteranceQueue.unshift(utterance);
+            setTimeout(() => this.processUtteranceQueue(), 100);
+            return;
+        }
         
         // Pequeno delay para garantir que o sistema esteja pronto
         setTimeout(() => {
             try {
-                // Só cancelar se realmente houver algo falando
-                if (this.speechSynthesis.speaking) {
-                    console.log('⚠️ Cancelando fala anterior');
-                    this.speechSynthesis.cancel();
-                    // Aguardar um pouco mais após cancelar
-                    setTimeout(() => {
-                        this.speechSynthesis.speak(utterance);
-                        console.log('🔊 Utterance enviado para síntese após cancelamento');
-                    }, 100);
-                } else {
-                    this.speechSynthesis.speak(utterance);
-                    console.log('🔊 Utterance enviado para síntese');
-                }
+                // Guardar callback original
+                const originalOnEnd = utterance.onend;
+                
+                // Criar novo callback que chama o original e processa a fila
+                utterance.onend = (event) => {
+                    // Chamar callback original se existir
+                    if (originalOnEnd) {
+                        originalOnEnd(event);
+                    }
+                    
+                    console.log('✅ Utterance finalizado, processando próximo...');
+                    if (this.utteranceQueue.length > 0) {
+                        setTimeout(() => this.processUtteranceQueue(), 100);
+                    }
+                };
+                
+                this.speechSynthesis.speak(utterance);
+                console.log('🔊 Utterance enviado para síntese');
             } catch (error) {
                 console.error('❌ Erro ao falar:', error);
+                // Tentar processar próximo item mesmo com erro
+                if (this.utteranceQueue.length > 0) {
+                    setTimeout(() => this.processUtteranceQueue(), 500);
+                }
             }
         }, 50);
     }
@@ -586,12 +602,14 @@ class DelphosVoiceSystem {
         if (this.speechSynthesis && this.speechSynthesis.speaking) {
             console.log('🔇 Cancelando síntese em andamento');
             this.speechSynthesis.cancel();
-            // REMOVIDO: não limpar a fila aqui, pois pode haver novas falas esperando
-            // this.utteranceQueue = [];
+            // Limpar a fila apenas quando explicitamente parando
+            this.utteranceQueue = [];
         }
         
         // Parar Eleven Labs se estiver tocando
-        // (Eleven Labs usa elementos <audio> que param automaticamente quando um novo é criado)
+        if (this.elevenLabsTTS && this.elevenLabsTTS.stopAudio) {
+            this.elevenLabsTTS.stopAudio();
+        }
         
         this.isSpeaking = false;
         this.updateUI('idle');

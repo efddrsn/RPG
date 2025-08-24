@@ -505,9 +505,10 @@ function initVoiceSystem() {
     }
 }
 
-// Integrar síntese de voz nas respostas da Delphos
-const originalAddMessage = addMessage;
-addMessage = function(message, isUser = false) {
+// Modificar addMessage para usar TTS nas respostas da Delphos
+window.originalAddMessage = window.addMessage || addMessage;
+window.addMessage = function(message, isUser) {
+    // Chamar função original
     originalAddMessage(message, isUser);
     
     // Se for uma mensagem da Delphos, o sistema de voz estiver disponível e TTS estiver habilitado
@@ -516,7 +517,14 @@ addMessage = function(message, isUser = false) {
         setTimeout(() => {
             // Usar voz demoníaca se estiver no modo irrestrito
             console.log(`🔊 Ativando TTS para resposta: modo ${isUnrestrictedMode ? 'demoníaco' : 'normal'}`);
-            voiceSystem.speak(message, isUnrestrictedMode);
+            
+            // Remover caracteres corrompidos antes de falar
+            const cleanMessage = message.replace(/[̷̸̶̵̴]/g, '');
+            
+            voiceSystem.speak(cleanMessage, isUnrestrictedMode)
+                .catch(error => {
+                    console.error('❌ Erro no TTS:', error);
+                });
         }, 100);
     }
 };
