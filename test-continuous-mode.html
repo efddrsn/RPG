@@ -328,7 +328,8 @@
     <!-- Scripts -->
     <script src="secrets-config.js"></script>
     <script src="github-secrets.js"></script>
-    <script src="speech-to-speech-continuous.js"></script>
+    <script src="elevenlabs-speech-to-speech.js"></script>
+    <script src="elevenlabs-enhanced.js"></script>
     <script>
         // Estado global
         let speechSystem = null;
@@ -366,58 +367,40 @@
                     }
                 }
                 
-                // Criar sistema de voz
-                speechSystem = new ContinuousSpeechSystem(elevenLabsKey);
-                
-                // Configurar callbacks
-                speechSystem.onStatusChange = (status) => {
-                    updateUIStatus(status);
-                };
-                
-                speechSystem.onTranscription = (text, isFinal) => {
-                    if (isFinal) {
-                        addMessage('user', text);
-                    } else {
-                        updateStatusMessage(`Ouvindo: ${text}`);
-                    }
-                };
-                
-                speechSystem.onResponse = (text) => {
-                    addMessage('ai', text);
-                };
-                
-                speechSystem.onError = (error) => {
-                    console.error('Erro:', error);
-                    addMessage('error', error.message);
+                // Criar sistema Speech-to-Speech
+                if (elevenLabsKey) {
+                    speechSystem = new ElevenLabsSpeechToSpeech(elevenLabsKey);
                     
-                    // Mostrar botão de permissão se necessário
-                    if (error.message.includes('microfone')) {
-                        permissionBtn.style.display = 'inline-block';
-                    }
-                };
-                
-                // Substituir processUserInput para integração com ChatGPT
-                speechSystem.processUserInput = async function(text) {
-                    try {
-                        this.updateStatus('processing');
+                    // Configurar callbacks
+                    speechSystem.onProcessingStart = () => {
+                        updateUIStatus('processing');
+                        updateStatusMessage('Processando Speech-to-Speech...');
+                    };
+                    
+                    speechSystem.onProcessingEnd = () => {
+                        updateUIStatus('ready');
+                        updateStatusMessage('Pronto para gravar');
+                    };
+                    
+                    speechSystem.onError = (error) => {
+                        console.error('Erro:', error);
+                        addMessage('error', error.message);
+                        updateUIStatus('error');
                         
-                        // Integração com ChatGPT aqui
-                        // Por enquanto, resposta simulada
-                        const response = await getAIResponse(text);
-                        
-                        // Sintetizar e reproduzir resposta
-                        await this.speak(response);
-                        
-                    } catch (error) {
-                        console.error('❌ Erro ao processar entrada:', error);
-                        this.onError?.(error);
-                        
-                        // Reiniciar reconhecimento mesmo com erro
-                        if (this.isActive) {
-                            await this.restartRecognition();
+                        // Mostrar botão de permissão se necessário
+                        if (error.message.includes('microfone')) {
+                            permissionBtn.style.display = 'inline-block';
                         }
-                    }
-                };
+                    };
+                    
+                    speechSystem.onAudioReady = (audioUrl, blob) => {
+                        console.log('Áudio pronto:', audioUrl);
+                    };
+                } else {
+                    addMessage('error', 'API Key do Eleven Labs não encontrada');
+                }
+                
+
                 
                 updateUIStatus('ready');
                 
@@ -427,23 +410,20 @@
             }
         });
         
-        // Alternar modo contínuo
+        // Alternar gravação Speech-to-Speech
         async function toggleContinuousMode() {
             if (!speechSystem) return;
             
-            if (!isActive) {
-                const started = await speechSystem.start();
-                if (started) {
-                    isActive = true;
-                    mainButton.classList.add('active');
-                    updateStatusMessage('Modo contínuo ativo');
-                }
+            if (!speechSystem.isRecording) {
+                await speechSystem.startRecording();
+                mainButton.classList.add('active');
+                mainButton.textContent = '⏹️';
+                updateStatusMessage('Gravando...');
             } else {
-                speechSystem.stop();
-                isActive = false;
+                await speechSystem.stopRecording();
                 mainButton.classList.remove('active');
-                mainButton.classList.remove('speaking');
-                updateStatusMessage('Modo contínuo desativado');
+                mainButton.textContent = '🎤';
+                updateStatusMessage('Gravação parada');
                 audioVisualizer.style.display = 'none';
             }
         }

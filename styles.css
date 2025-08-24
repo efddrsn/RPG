@@ -546,6 +546,36 @@ body.unrestricted .voice-indicator.speaking {
     }
 }
 
+.voice-btn {
+    background: #1a1a2e;
+    color: #00ff88;
+    border: 2px solid #00ff88;
+    border-radius: 8px;
+    padding: 10px 15px;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.voice-btn:hover {
+    background: #00ff88;
+    color: #000;
+    transform: scale(1.05);
+}
+
+.voice-btn.recording {
+    background: #ff4444;
+    border-color: #ff4444;
+    color: white;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
 body.unrestricted .voice-btn {
     color: #f00;
     border-color: #f00;

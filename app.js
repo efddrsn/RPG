@@ -267,22 +267,8 @@ async function sendMessage() {
     const response = await getAIResponse(message);
     addMessage(response, 'ai');
     
-    // Usar TTS do Eleven Labs se habilitado
-    if (ttsEnabled && speechSystem) {
-        try {
-            // Limpar texto para TTS
-            const cleanText = response
-                .replace(/[◉⊙◈⬟⬢]/g, '') // Remove símbolos especiais
-                .replace(/[\u0300-\u036f]/g, '') // Remove diacríticos corrompidos
-                .trim();
-            
-            if (cleanText) {
-                await speechSystem.speak(cleanText);
-            }
-        } catch (error) {
-            console.error('Erro ao sintetizar voz:', error);
-        }
-    }
+    // O Speech-to-Speech processa tudo de uma vez,
+    // não precisamos de TTS separado
 }
 
 // Verificar palavras proibidas
@@ -454,14 +440,13 @@ function resetChat() {
     changeEpisode(currentEpisode);
 }
 
-// Sistema de voz
-let voiceSystem = null;
-let speechSystem = null; // Novo sistema de modo contínuo
-let ttsEnabled = true; // Controle para ativar/desativar TTS das respostas
+// Sistema de voz Speech-to-Speech
+let speechSystem = null;
+let ttsEnabled = true; // Controle para ativar/desativar respostas de voz
 
 // Inicializar sistema de voz
 async function initVoiceSystem() {
-    console.log('🎙️ Iniciando sistema de voz...');
+    console.log('🎙️ Iniciando sistema Speech-to-Speech...');
     try {
         // Verificar se temos a chave do ElevenLabs
         let elevenLabsKey = localStorage.getItem('elevenlabs_api_key');
@@ -478,60 +463,40 @@ async function initVoiceSystem() {
             }
         }
         
-        // Criar novo sistema de modo contínuo
-        speechSystem = new ContinuousSpeechSystem(elevenLabsKey);
-        
-        // Configurar callbacks
-        speechSystem.onTranscription = (text, isFinal) => {
-            if (isFinal) {
-                // Enviar texto para processamento
-                document.getElementById('user-input').value = text;
-                sendMessage();
-            }
-        };
-        
-        speechSystem.onStatusChange = (status) => {
-            const voiceIndicator = document.getElementById('voice-indicator');
-            if (voiceIndicator) {
-                if (status === 'listening' || status === 'speaking' || status === 'processing') {
+        // Criar novo sistema Speech-to-Speech
+        if (elevenLabsKey) {
+            speechSystem = new ElevenLabsSpeechToSpeech(elevenLabsKey);
+            
+            // Configurar callbacks
+            speechSystem.onProcessingStart = () => {
+                const voiceIndicator = document.getElementById('voice-indicator');
+                if (voiceIndicator) {
                     voiceIndicator.classList.remove('hidden');
-                    voiceIndicator.querySelector('.indicator-text').textContent = 
-                        status === 'listening' ? 'Ouvindo...' :
-                        status === 'speaking' ? 'Falando...' : 'Processando...';
-                } else {
+                    const indicatorText = voiceIndicator.querySelector('.indicator-text');
+                    if (indicatorText) {
+                        indicatorText.textContent = 'Processando...';
+                    }
+                }
+            };
+            
+            speechSystem.onProcessingEnd = () => {
+                const voiceIndicator = document.getElementById('voice-indicator');
+                if (voiceIndicator) {
                     voiceIndicator.classList.add('hidden');
                 }
-            }
-        };
+            };
+            
+            speechSystem.onError = (error) => {
+                console.error('❌ Erro no Speech-to-Speech:', error);
+                addMessage('Erro no sistema de voz: ' + error.message, 'system');
+            };
+            
+            console.log('✅ Sistema Speech-to-Speech criado');
+        } else {
+            console.warn('⚠️ API Key do Eleven Labs não encontrada');
+        }
         
-        speechSystem.onError = (error) => {
-            console.error('Erro no sistema de voz:', error);
-            addMessage('system', `Erro: ${error.message}`);
-        };
-        
-        // Substituir processUserInput para integração com ChatGPT
-        speechSystem.processUserInput = async function(text) {
-            try {
-                this.updateStatus('processing');
-                
-                // Enviar mensagem através do sistema existente
-                document.getElementById('user-input').value = text;
-                await sendMessage();
-                
-                // A resposta será falada automaticamente pelo sistema existente
-                
-            } catch (error) {
-                console.error('❌ Erro ao processar entrada:', error);
-                this.onError?.(error);
-                
-                // Reiniciar reconhecimento mesmo com erro
-                if (this.isActive) {
-                    await this.restartRecognition();
-                }
-            }
-        };
-        
-        console.log('✅ Sistema de modo contínuo criado com sucesso');
+
         
         // Configurar botões de voz
         const voiceBtn = document.getElementById('voice-btn');
@@ -545,30 +510,28 @@ async function initVoiceSystem() {
             voiceIndicator: !!voiceIndicator
         });
         
-        // Botão de gravação - agora não usado mais (apenas modo contínuo)
+        // Botão de gravação - Speech-to-Speech
         if (voiceBtn) {
-            voiceBtn.style.display = 'none'; // Esconder botão antigo
-        }
-        
-        // Botão de modo conversacional - agora ativa modo contínuo
-        if (voiceModeBtn) {
-            voiceModeBtn.addEventListener('click', async () => {
-                console.log('💬 Botão de modo contínuo clicado');
-                if (!speechSystem.isActive) {
-                    const started = await speechSystem.start();
-                    if (started) {
-                        voiceModeBtn.classList.add('active');
-                        voiceModeBtn.title = 'Modo contínuo ativo';
+            voiceBtn.addEventListener('click', async () => {
+                console.log('🎤 Botão de voz clicado');
+                if (speechSystem) {
+                    if (speechSystem.isRecording) {
+                        voiceBtn.classList.remove('recording');
+                        voiceBtn.textContent = '🎙️';
+                        await speechSystem.stopRecording();
+                    } else {
+                        voiceBtn.classList.add('recording');
+                        voiceBtn.textContent = '⏹️';
+                        await speechSystem.startRecording();
                     }
-                } else {
-                    speechSystem.stop();
-                    voiceModeBtn.classList.remove('active');
-                    voiceModeBtn.title = 'Modo contínuo';
                 }
             });
-            console.log('✅ Event listener adicionado ao botão de modo contínuo');
-        } else {
-            console.error('❌ Botão de modo contínuo não encontrado!');
+            console.log('✅ Event listener adicionado ao botão de voz');
+        }
+        
+        // Esconder botão de modo conversacional (não usado com Speech-to-Speech puro)
+        if (voiceModeBtn) {
+            voiceModeBtn.style.display = 'none';
         }
         
         // Configurar botão de TTS
