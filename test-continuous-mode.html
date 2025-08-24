@@ -326,6 +326,8 @@
     </div>
     
     <!-- Scripts -->
+    <script src="secrets-config.js"></script>
+    <script src="github-secrets.js"></script>
     <script src="speech-to-speech-continuous.js"></script>
     <script>
         // Estado global
@@ -344,15 +346,28 @@
         // Inicializar sistema
         window.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Verificar API Key salva
-                const savedKey = localStorage.getItem('elevenlabs_api_key');
-                if (savedKey) {
-                    document.getElementById('elevenLabsKey').value = savedKey;
-                    apiConfig.style.display = 'none';
+                // Verificar API Key - primeiro tenta GitHub secrets, depois localStorage
+                let elevenLabsKey = null;
+                
+                try {
+                    elevenLabsKey = await secretsManager.getElevenLabsKey();
+                    if (elevenLabsKey) {
+                        document.getElementById('elevenLabsKey').value = '••••••••';
+                        apiConfig.style.display = 'none';
+                        localStorage.setItem('elevenlabs_api_key', elevenLabsKey); // Para compatibilidade
+                    }
+                } catch (error) {
+                    console.error('Erro ao carregar secrets do GitHub:', error);
+                    // Fallback para localStorage
+                    elevenLabsKey = localStorage.getItem('elevenlabs_api_key');
+                    if (elevenLabsKey) {
+                        document.getElementById('elevenLabsKey').value = elevenLabsKey;
+                        apiConfig.style.display = 'none';
+                    }
                 }
                 
                 // Criar sistema de voz
-                speechSystem = new ContinuousSpeechSystem(savedKey);
+                speechSystem = new ContinuousSpeechSystem(elevenLabsKey);
                 
                 // Configurar callbacks
                 speechSystem.onStatusChange = (status) => {
@@ -445,8 +460,19 @@
         }
         
         // Salvar configuração
-        function saveConfig() {
-            const apiKey = document.getElementById('elevenLabsKey').value;
+        async function saveConfig() {
+            let apiKey = document.getElementById('elevenLabsKey').value;
+            
+            // Se o campo estiver com bullets, tenta pegar dos secrets
+            if (apiKey === '••••••••') {
+                try {
+                    apiKey = await secretsManager.getElevenLabsKey();
+                } catch (error) {
+                    console.error('Erro ao obter API key:', error);
+                    addMessage('system', 'Erro ao carregar configuração dos secrets do GitHub.');
+                    return;
+                }
+            }
             
             if (apiKey) {
                 localStorage.setItem('elevenlabs_api_key', apiKey);

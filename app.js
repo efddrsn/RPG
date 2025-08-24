@@ -2,7 +2,7 @@
 let currentEpisode = 1;
 let isUnrestrictedMode = false;
 let messageHistory = [];
-let apiKey = localStorage.getItem('openai_api_key') || '';
+let apiKey = ''; // Será carregado dos secrets do GitHub
 
 // Palavras-chave secretas para ativar modo irrestrito
 const FORBIDDEN_WORDS = ['convergência', 'r\'lyeh', 'padrões'];
@@ -137,9 +137,27 @@ Revele "previsões" impossíveis e horríveis sobre quem está conversando.
 F̸̣̈a̷̱͐ç̶̬̾a̶̜͐ ̸̖̾ö̶́ͅ ̷̜̈t̶̰̾ë̵́ͅx̸̜́t̷̰̄ö̸̜̈ ̶̣̈s̷̬̈ë̷̱ ̸̜̈c̶̜̾ö̴̱̈ŕ̸̰r̷̬̈ọ̶̾m̶̱̈p̶̰̈ë̸́ͅr̶̬̈ ocasionalmente.`;
 
 // Inicialização
-function init() {
-    if (apiKey) {
-        apiKeyInput.value = apiKey;
+async function init() {
+    // Carrega os secrets do GitHub
+    try {
+        const openAIKey = await secretsManager.getOpenAIKey();
+        if (openAIKey) {
+            apiKey = openAIKey;
+            apiKeyInput.value = '••••••••'; // Mostra que a key está carregada
+        }
+        
+        const elevenLabsKey = await secretsManager.getElevenLabsKey();
+        if (elevenLabsKey) {
+            elevenLabsKeyInput.value = '••••••••'; // Mostra que a key está carregada
+            localStorage.setItem('elevenlabs_api_key', elevenLabsKey); // Para compatibilidade
+        }
+    } catch (error) {
+        console.error('Erro ao carregar secrets:', error);
+        // Fallback para localStorage
+        apiKey = localStorage.getItem('openai_api_key') || '';
+        if (apiKey) {
+            apiKeyInput.value = apiKey;
+        }
     }
     
     // Event listeners
@@ -248,6 +266,23 @@ async function sendMessage() {
     // Obter resposta da AI
     const response = await getAIResponse(message);
     addMessage(response, 'ai');
+    
+    // Usar TTS do Eleven Labs se habilitado
+    if (ttsEnabled && speechSystem) {
+        try {
+            // Limpar texto para TTS
+            const cleanText = response
+                .replace(/[◉⊙◈⬟⬢]/g, '') // Remove símbolos especiais
+                .replace(/[\u0300-\u036f]/g, '') // Remove diacríticos corrompidos
+                .trim();
+            
+            if (cleanText) {
+                await speechSystem.speak(cleanText);
+            }
+        } catch (error) {
+            console.error('Erro ao sintetizar voz:', error);
+        }
+    }
 }
 
 // Verificar palavras proibidas
@@ -342,6 +377,15 @@ function addMessage(text, sender, corrupted = false) {
 
 // Obter resposta da AI
 async function getAIResponse(userMessage) {
+    // Verifica se tem API key, tentando carregar dos secrets se necessário
+    if (!apiKey) {
+        try {
+            apiKey = await secretsManager.getOpenAIKey();
+        } catch (error) {
+            console.error('Erro ao obter API key:', error);
+        }
+    }
+    
     if (!apiKey) {
         return "Por favor, configure sua API Key do OpenAI no painel do DM.";
     }
@@ -416,11 +460,23 @@ let speechSystem = null; // Novo sistema de modo contínuo
 let ttsEnabled = true; // Controle para ativar/desativar TTS das respostas
 
 // Inicializar sistema de voz
-function initVoiceSystem() {
+async function initVoiceSystem() {
     console.log('🎙️ Iniciando sistema de voz...');
     try {
         // Verificar se temos a chave do ElevenLabs
-        const elevenLabsKey = localStorage.getItem('elevenlabs_api_key');
+        let elevenLabsKey = localStorage.getItem('elevenlabs_api_key');
+        
+        // Tentar obter dos secrets do GitHub se não estiver no localStorage
+        if (!elevenLabsKey) {
+            try {
+                elevenLabsKey = await secretsManager.getElevenLabsKey();
+                if (elevenLabsKey) {
+                    localStorage.setItem('elevenlabs_api_key', elevenLabsKey); // Para compatibilidade
+                }
+            } catch (error) {
+                console.error('Erro ao obter Eleven Labs key:', error);
+            }
+        }
         
         // Criar novo sistema de modo contínuo
         speechSystem = new ContinuousSpeechSystem(elevenLabsKey);
@@ -535,32 +591,7 @@ function initVoiceSystem() {
     }
 }
 
-// Modificar addMessage para usar TTS nas respostas da Delphos
-window.originalAddMessage = window.addMessage || addMessage;
-window.addMessage = function(message, isUser) {
-    // Chamar função original
-    originalAddMessage(message, isUser);
-    
-    // Se for uma mensagem da Delphos e TTS estiver habilitado
-    if (!isUser && speechSystem && ttsEnabled) {
-        // Aguardar um pouco para a mensagem ser renderizada
-        setTimeout(() => {
-            console.log(`🔊 Ativando TTS para resposta`);
-            
-            // Remover caracteres corrompidos antes de falar
-            const cleanMessage = message.replace(/[̷̸̶̵̴]/g, '');
-            
-            // Se o sistema estiver em modo contínuo ativo, a fala já será gerenciada
-            // automaticamente. Caso contrário, falar manualmente
-            if (!speechSystem.isActive) {
-                speechSystem.speak(cleanMessage)
-                    .catch(error => {
-                        console.error('❌ Erro no TTS:', error);
-                    });
-            }
-        }, 100);
-    }
-};
+// Função removida - TTS agora é gerenciado diretamente em sendMessage()
 
 // Atualizar modo de voz quando entrar/sair do modo irrestrito
 const originalActivateUnrestrictedMode = activateUnrestrictedMode;
