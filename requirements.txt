@@ -1,0 +1,14 @@
+elevenlabs==0.3.0
+openai-whisper==20231117
+pyaudio==0.2.14
+numpy==1.26.4
+scipy==1.11.4
+flask==3.0.0
+flask-cors==4.0.0
+python-dotenv==1.0.0
+sounddevice==0.4.6
+soundfile==0.12.1
+requests==2.31.0
+pydub==0.25.1
+websocket-client==1.7.0
+aiohttp==3.9.1
