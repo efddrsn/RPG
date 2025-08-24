@@ -412,14 +412,70 @@ function resetChat() {
 
 // Sistema de voz
 let voiceSystem = null;
+let speechSystem = null; // Novo sistema de modo contínuo
 let ttsEnabled = true; // Controle para ativar/desativar TTS das respostas
 
 // Inicializar sistema de voz
 function initVoiceSystem() {
     console.log('🎙️ Iniciando sistema de voz...');
     try {
-        voiceSystem = new DelphosVoiceSystem();
-        console.log('✅ Sistema de voz criado com sucesso');
+        // Verificar se temos a chave do ElevenLabs
+        const elevenLabsKey = localStorage.getItem('elevenlabs_api_key');
+        
+        // Criar novo sistema de modo contínuo
+        speechSystem = new ContinuousSpeechSystem(elevenLabsKey);
+        
+        // Configurar callbacks
+        speechSystem.onTranscription = (text, isFinal) => {
+            if (isFinal) {
+                // Enviar texto para processamento
+                document.getElementById('user-input').value = text;
+                sendMessage();
+            }
+        };
+        
+        speechSystem.onStatusChange = (status) => {
+            const voiceIndicator = document.getElementById('voice-indicator');
+            if (voiceIndicator) {
+                if (status === 'listening' || status === 'speaking' || status === 'processing') {
+                    voiceIndicator.classList.remove('hidden');
+                    voiceIndicator.querySelector('.indicator-text').textContent = 
+                        status === 'listening' ? 'Ouvindo...' :
+                        status === 'speaking' ? 'Falando...' : 'Processando...';
+                } else {
+                    voiceIndicator.classList.add('hidden');
+                }
+            }
+        };
+        
+        speechSystem.onError = (error) => {
+            console.error('Erro no sistema de voz:', error);
+            addMessage('system', `Erro: ${error.message}`);
+        };
+        
+        // Substituir processUserInput para integração com ChatGPT
+        speechSystem.processUserInput = async function(text) {
+            try {
+                this.updateStatus('processing');
+                
+                // Enviar mensagem através do sistema existente
+                document.getElementById('user-input').value = text;
+                await sendMessage();
+                
+                // A resposta será falada automaticamente pelo sistema existente
+                
+            } catch (error) {
+                console.error('❌ Erro ao processar entrada:', error);
+                this.onError?.(error);
+                
+                // Reiniciar reconhecimento mesmo com erro
+                if (this.isActive) {
+                    await this.restartRecognition();
+                }
+            }
+        };
+        
+        console.log('✅ Sistema de modo contínuo criado com sucesso');
         
         // Configurar botões de voz
         const voiceBtn = document.getElementById('voice-btn');
@@ -433,34 +489,30 @@ function initVoiceSystem() {
             voiceIndicator: !!voiceIndicator
         });
         
-        // Botão de gravação
+        // Botão de gravação - agora não usado mais (apenas modo contínuo)
         if (voiceBtn) {
-            voiceBtn.addEventListener('click', () => {
-                console.log('🎤 Botão de voz clicado');
-                if (voiceSystem.isListening) {
-                    console.log('⏸️ Parando gravação...');
-                    voiceSystem.stopListening();
-                } else {
-                    console.log('▶️ Iniciando gravação...');
-                    voiceSystem.startListening();
-                }
-            });
-            console.log('✅ Event listener adicionado ao botão de voz');
-        } else {
-            console.error('❌ Botão de voz não encontrado!');
+            voiceBtn.style.display = 'none'; // Esconder botão antigo
         }
         
-        // Botão de modo conversacional
+        // Botão de modo conversacional - agora ativa modo contínuo
         if (voiceModeBtn) {
-            voiceModeBtn.addEventListener('click', () => {
-                console.log('💬 Botão de modo conversacional clicado');
-                const isActive = voiceSystem.toggleConversationalMode();
-                voiceModeBtn.classList.toggle('active', isActive);
-                voiceModeBtn.title = isActive ? 'Modo conversacional ativo' : 'Modo conversacional';
+            voiceModeBtn.addEventListener('click', async () => {
+                console.log('💬 Botão de modo contínuo clicado');
+                if (!speechSystem.isActive) {
+                    const started = await speechSystem.start();
+                    if (started) {
+                        voiceModeBtn.classList.add('active');
+                        voiceModeBtn.title = 'Modo contínuo ativo';
+                    }
+                } else {
+                    speechSystem.stop();
+                    voiceModeBtn.classList.remove('active');
+                    voiceModeBtn.title = 'Modo contínuo';
+                }
             });
-            console.log('✅ Event listener adicionado ao botão de modo conversacional');
+            console.log('✅ Event listener adicionado ao botão de modo contínuo');
         } else {
-            console.error('❌ Botão de modo conversacional não encontrado!');
+            console.error('❌ Botão de modo contínuo não encontrado!');
         }
         
         // Configurar botão de TTS
@@ -477,28 +529,6 @@ function initVoiceSystem() {
             console.error('❌ Botão de TTS não encontrado!');
         }
         
-        // Mostrar/esconder indicador de voz
-        if (voiceIndicator) {
-            const originalUpdateUI = voiceSystem.updateUI.bind(voiceSystem);
-            voiceSystem.updateUI = function(state, error) {
-                originalUpdateUI(state, error);
-                
-                console.log(`🎨 Atualizando UI para estado: ${state}`);
-                
-                if (state === 'idle') {
-                    setTimeout(() => {
-                        if (!this.isListening && !this.isSpeaking) {
-                            voiceIndicator.classList.add('hidden');
-                        }
-                    }, 500);
-                } else {
-                    voiceIndicator.classList.remove('hidden');
-                }
-            };
-        } else {
-            console.error('❌ Indicador de voz não encontrado!');
-        }
-        
         console.log('🎙️ Sistema de voz inicializado');
     } catch (error) {
         console.error('Erro ao inicializar sistema de voz:', error);
@@ -511,20 +541,23 @@ window.addMessage = function(message, isUser) {
     // Chamar função original
     originalAddMessage(message, isUser);
     
-    // Se for uma mensagem da Delphos, o sistema de voz estiver disponível e TTS estiver habilitado
-    if (!isUser && voiceSystem && ttsEnabled) {
+    // Se for uma mensagem da Delphos e TTS estiver habilitado
+    if (!isUser && speechSystem && ttsEnabled) {
         // Aguardar um pouco para a mensagem ser renderizada
         setTimeout(() => {
-            // Usar voz demoníaca se estiver no modo irrestrito
-            console.log(`🔊 Ativando TTS para resposta: modo ${isUnrestrictedMode ? 'demoníaco' : 'normal'}`);
+            console.log(`🔊 Ativando TTS para resposta`);
             
             // Remover caracteres corrompidos antes de falar
             const cleanMessage = message.replace(/[̷̸̶̵̴]/g, '');
             
-            voiceSystem.speak(cleanMessage, isUnrestrictedMode)
-                .catch(error => {
-                    console.error('❌ Erro no TTS:', error);
-                });
+            // Se o sistema estiver em modo contínuo ativo, a fala já será gerenciada
+            // automaticamente. Caso contrário, falar manualmente
+            if (!speechSystem.isActive) {
+                speechSystem.speak(cleanMessage)
+                    .catch(error => {
+                        console.error('❌ Erro no TTS:', error);
+                    });
+            }
         }, 100);
     }
 };
