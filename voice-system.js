@@ -223,6 +223,17 @@ class DelphosVoiceSystem {
                 voice.lang.includes('pt')
             ) || availableVoices[0];
             
+            // Log detalhado da voz selecionada
+            if (this.voices.normal) {
+                console.log('🎤 Voz normal selecionada:', {
+                    name: this.voices.normal.name,
+                    lang: this.voices.normal.lang,
+                    voiceURI: this.voices.normal.voiceURI,
+                    localService: this.voices.normal.localService,
+                    default: this.voices.normal.default
+                });
+            }
+            
             // Para voz demoníaca, preferir uma voz masculina grave
             this.voices.demonic = availableVoices.find(voice => 
                 voice.lang.includes('pt-BR') && 
@@ -368,7 +379,16 @@ class DelphosVoiceSystem {
     // Sintetizar fala - agora com suporte para Eleven Labs
     async speak(text, isUnrestricted = false) {
         console.log(`🔊 speak chamado: "${text.substring(0, 50)}..." (modo ${isUnrestricted ? 'demoníaco' : 'normal'}, TTS: ${this.ttsMode})`);
-        console.log(`📊 Estado atual: isSpeaking=${this.isSpeaking}, voicesLoaded=${this.voicesLoaded}`);
+        console.log(`📊 Estado atual:`, {
+            isSpeaking: this.isSpeaking,
+            voicesLoaded: this.voicesLoaded,
+            elevenLabsConfigured: this.elevenLabsTTS !== null,
+            voiceMode: this.voiceMode,
+            hasNormalVoice: this.voices.normal !== null,
+            hasDemonicVoice: this.voices.demonic !== null,
+            normalVoiceName: this.voices.normal?.name || 'Não configurada',
+            demonicVoiceName: this.voices.demonic?.name || 'Não configurada'
+        });
         
         // REMOVIDO: não parar fala anterior aqui, deixar o processamento da fila gerenciar isso
         // this.stopSpeaking();
@@ -464,6 +484,14 @@ class DelphosVoiceSystem {
                     utterance.pitch = 1.0;
                     utterance.rate = 1.0;
                     utterance.volume = 1.0;
+                    console.log('🔊 Configurando voz normal:', {
+                        voice: this.voices.normal.name,
+                        volume: utterance.volume,
+                        pitch: utterance.pitch,
+                        rate: utterance.rate
+                    });
+                } else {
+                    console.warn('⚠️ Nenhuma voz configurada, usando padrão do sistema');
                 }
                 
                 utterance.lang = 'pt-BR';
@@ -547,6 +575,14 @@ class DelphosVoiceSystem {
         // Pequeno delay para garantir que o sistema esteja pronto
         setTimeout(() => {
             try {
+                console.log('🔄 Processando utterance da fila...');
+                
+                // Cancelar qualquer fala anterior pendente
+                if (this.speechSynthesis.speaking) {
+                    console.log('⚠️ Cancelando fala anterior...');
+                    this.speechSynthesis.cancel();
+                }
+                
                 // Guardar callback original
                 const originalOnEnd = utterance.onend;
                 
