@@ -368,9 +368,10 @@ class DelphosVoiceSystem {
     // Sintetizar fala - agora com suporte para Eleven Labs
     async speak(text, isUnrestricted = false) {
         console.log(`🔊 speak chamado: "${text.substring(0, 50)}..." (modo ${isUnrestricted ? 'demoníaco' : 'normal'}, TTS: ${this.ttsMode})`);
+        console.log(`📊 Estado atual: isSpeaking=${this.isSpeaking}, voicesLoaded=${this.voicesLoaded}`);
         
-        // Parar qualquer fala anterior
-        this.stopSpeaking();
+        // REMOVIDO: não parar fala anterior aqui, deixar o processamento da fila gerenciar isso
+        // this.stopSpeaking();
         
         // Usar Eleven Labs se disponível e configurado
         if (this.ttsMode === 'elevenlabs' && this.elevenLabsTTS) {
@@ -512,7 +513,9 @@ class DelphosVoiceSystem {
                 };
                 
                 // Adicionar à fila e processar
+                console.log('📥 Adicionando utterance à fila');
                 this.utteranceQueue.push(utterance);
+                console.log(`📋 Tamanho da fila: ${this.utteranceQueue.length}`);
                 this.processUtteranceQueue();
                 
             } catch (error) {
@@ -529,14 +532,27 @@ class DelphosVoiceSystem {
         const utterance = this.utteranceQueue.shift();
         
         // Garantir que o speechSynthesis esteja pronto
-        if (this.speechSynthesis.speaking || this.speechSynthesis.pending) {
-            this.speechSynthesis.cancel();
-        }
+        // REMOVIDO: cancelamento automático que estava causando problemas
+        // if (this.speechSynthesis.speaking || this.speechSynthesis.pending) {
+        //     this.speechSynthesis.cancel();
+        // }
         
         // Pequeno delay para garantir que o sistema esteja pronto
         setTimeout(() => {
             try {
-                this.speechSynthesis.speak(utterance);
+                // Só cancelar se realmente houver algo falando
+                if (this.speechSynthesis.speaking) {
+                    console.log('⚠️ Cancelando fala anterior');
+                    this.speechSynthesis.cancel();
+                    // Aguardar um pouco mais após cancelar
+                    setTimeout(() => {
+                        this.speechSynthesis.speak(utterance);
+                        console.log('🔊 Utterance enviado para síntese após cancelamento');
+                    }, 100);
+                } else {
+                    this.speechSynthesis.speak(utterance);
+                    console.log('🔊 Utterance enviado para síntese');
+                }
             } catch (error) {
                 console.error('❌ Erro ao falar:', error);
             }
@@ -564,10 +580,14 @@ class DelphosVoiceSystem {
     
     // Parar síntese
     stopSpeaking() {
+        console.log('🛑 stopSpeaking chamado');
+        
         // Parar TTS nativo
-        if (this.speechSynthesis) {
+        if (this.speechSynthesis && this.speechSynthesis.speaking) {
+            console.log('🔇 Cancelando síntese em andamento');
             this.speechSynthesis.cancel();
-            this.utteranceQueue = [];
+            // REMOVIDO: não limpar a fila aqui, pois pode haver novas falas esperando
+            // this.utteranceQueue = [];
         }
         
         // Parar Eleven Labs se estiver tocando

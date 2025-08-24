@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Correção Sistema de Voz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-section {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #333;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teste de Correção - Sistema de Voz</h1>
+    
+    <div class="test-section">
+        <h2>1. Teste Básico</h2>
+        <button onclick="testBasic()">Testar Fala Simples</button>
+        <button onclick="testMultiple()">Testar Múltiplas Falas</button>
+        <button onclick="testInterrupt()">Testar Interrupção</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Simulação do Chat</h2>
+        <button onclick="simulateChat()">Simular Resposta do Chat</button>
+        <div id="chat-status" class="status">Aguardando...</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Console</h2>
+        <button onclick="clearLog()">Limpar</button>
+        <div id="log" class="log"></div>
+    </div>
+    
+    <script src="voice-system.js"></script>
+    <script>
+        let voiceSystem = null;
+        const log = document.getElementById('log');
+        const chatStatus = document.getElementById('chat-status');
+        
+        // Interceptar logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        console.log = function(...args) {
+            originalLog(...args);
+            addLog(args.join(' '));
+        };
+        
+        console.error = function(...args) {
+            originalError(...args);
+            addLog('ERROR: ' + args.join(' '));
+        };
+        
+        function addLog(message) {
+            const time = new Date().toLocaleTimeString();
+            log.innerHTML += `[${time}] ${message}\n`;
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // Inicializar sistema
+        window.addEventListener('load', () => {
+            voiceSystem = new DelphosVoiceSystem();
+            addLog('Sistema de voz inicializado');
+            
+            // Aguardar vozes carregarem
+            setTimeout(() => {
+                addLog(`Vozes carregadas: ${voiceSystem.voicesLoaded}`);
+                if (voiceSystem.voices.normal) {
+                    addLog(`Voz normal: ${voiceSystem.voices.normal.name}`);
+                }
+            }, 1000);
+        });
+        
+        // Teste 1: Fala simples
+        async function testBasic() {
+            addLog('\n=== TESTE BÁSICO ===');
+            try {
+                await voiceSystem.speak('Olá! Este é um teste básico do sistema de voz.');
+                addLog('Teste básico concluído');
+            } catch (error) {
+                addLog(`Erro: ${error.message}`);
+            }
+        }
+        
+        // Teste 2: Múltiplas falas
+        async function testMultiple() {
+            addLog('\n=== TESTE MÚLTIPLAS FALAS ===');
+            try {
+                // Enviar várias falas em sequência
+                voiceSystem.speak('Primeira mensagem.');
+                voiceSystem.speak('Segunda mensagem.');
+                voiceSystem.speak('Terceira mensagem.');
+                addLog('Três mensagens enviadas');
+            } catch (error) {
+                addLog(`Erro: ${error.message}`);
+            }
+        }
+        
+        // Teste 3: Interrupção
+        async function testInterrupt() {
+            addLog('\n=== TESTE INTERRUPÇÃO ===');
+            try {
+                voiceSystem.speak('Esta é uma mensagem muito longa que será interrompida no meio da fala para testar se o sistema consegue lidar com interrupções adequadamente.');
+                
+                setTimeout(() => {
+                    addLog('Interrompendo...');
+                    voiceSystem.stopSpeaking();
+                    
+                    setTimeout(() => {
+                        voiceSystem.speak('Nova mensagem após interrupção.');
+                    }, 500);
+                }, 1500);
+            } catch (error) {
+                addLog(`Erro: ${error.message}`);
+            }
+        }
+        
+        // Teste 4: Simular chat
+        async function simulateChat() {
+            addLog('\n=== SIMULAÇÃO DE CHAT ===');
+            chatStatus.textContent = 'Simulando resposta da Delphos...';
+            
+            // Simular o comportamento do app.js
+            const message = 'Analisando os padrões oceânicos... Detectei anomalias nas correntes profundas. A convergência se aproxima.';
+            const isUnrestricted = false;
+            
+            // Simular delay de renderização
+            setTimeout(() => {
+                addLog(`Falando: "${message.substring(0, 50)}..."`);
+                voiceSystem.speak(message, isUnrestricted);
+                chatStatus.textContent = 'Resposta enviada para síntese';
+            }, 100);
+        }
+        
+        function clearLog() {
+            log.innerHTML = '';
+            addLog('Log limpo');
+        }
+    </script>
+</body>
+</html>
