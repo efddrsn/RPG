@@ -1,5 +1,6 @@
 // Sistema de Voz para Delphos AI
 // Suporta speech-to-text e text-to-speech com vozes diferentes para modo normal e irrestrito
+// Agora com suporte para Eleven Labs API
 
 class DelphosVoiceSystem {
     constructor() {
@@ -12,6 +13,18 @@ class DelphosVoiceSystem {
         this.isSpeaking = false;
         this.voiceMode = 'normal'; // 'normal' ou 'demonic'
         this.autoListen = false; // Para modo conversacional contínuo
+        this.voicesLoaded = false;
+        this.utteranceQueue = []; // Fila para garantir que utterances sejam processadas
+        
+        // Configuração de TTS
+        this.ttsMode = 'native'; // 'native' ou 'elevenlabs'
+        this.elevenLabsApiKey = localStorage.getItem('elevenlabs_api_key') || '';
+        this.elevenLabsTTS = null;
+        
+        // Inicializar Eleven Labs se houver API key
+        if (this.elevenLabsApiKey) {
+            this.initializeElevenLabs();
+        }
         
         // Configurações de voz
         this.voices = {
@@ -41,6 +54,71 @@ class DelphosVoiceSystem {
         // Configurar Web Audio API para efeitos demoníacos
         this.audioContext = null;
         this.setupAudioEffects();
+        
+        // Forçar carregamento de vozes em alguns navegadores
+        this.initializeSpeechSynthesis();
+    }
+    
+    // Inicializar Eleven Labs TTS
+    initializeElevenLabs() {
+        if (window.ElevenLabsTTS) {
+            try {
+                this.elevenLabsTTS = new window.ElevenLabsTTS(this.elevenLabsApiKey);
+                this.ttsMode = 'elevenlabs';
+                console.log('✅ Eleven Labs TTS inicializado');
+            } catch (error) {
+                console.error('❌ Erro ao inicializar Eleven Labs:', error);
+                this.ttsMode = 'native';
+            }
+        } else {
+            console.warn('⚠️ Eleven Labs TTS não está carregado');
+        }
+    }
+    
+    // Configurar API key do Eleven Labs
+    setElevenLabsApiKey(apiKey) {
+        this.elevenLabsApiKey = apiKey;
+        localStorage.setItem('elevenlabs_api_key', apiKey);
+        
+        if (apiKey) {
+            this.initializeElevenLabs();
+        } else {
+            this.ttsMode = 'native';
+            this.elevenLabsTTS = null;
+        }
+    }
+    
+    // Alternar entre TTS nativo e Eleven Labs
+    setTTSMode(mode) {
+        if (mode === 'elevenlabs' && !this.elevenLabsTTS) {
+            console.warn('⚠️ Eleven Labs não está configurado. Usando TTS nativo.');
+            this.ttsMode = 'native';
+            return false;
+        }
+        
+        this.ttsMode = mode;
+        console.log(`🔊 Modo TTS alterado para: ${mode}`);
+        return true;
+    }
+    
+    // Inicializar Speech Synthesis para garantir que funcione
+    initializeSpeechSynthesis() {
+        // Alguns navegadores precisam de uma interação inicial para carregar vozes
+        if (this.speechSynthesis) {
+            // Criar um utterance vazio para forçar inicialização
+            const initUtterance = new SpeechSynthesisUtterance('');
+            initUtterance.volume = 0;
+            this.speechSynthesis.speak(initUtterance);
+            this.speechSynthesis.cancel();
+            
+            // Adicionar listener para mudanças de voz
+            if (this.speechSynthesis.onvoiceschanged !== undefined) {
+                this.speechSynthesis.onvoiceschanged = () => {
+                    console.log('🔊 Evento voiceschanged disparado');
+                    this.loadVoices();
+                };
+            }
+        }
     }
     
     // Configurar reconhecimento de voz
@@ -90,11 +168,20 @@ class DelphosVoiceSystem {
         const setVoices = () => {
             const availableVoices = this.speechSynthesis.getVoices();
             
+            console.log(`🔊 Carregando vozes... Total disponível: ${availableVoices.length}`);
+            
+            if (availableVoices.length === 0) {
+                console.warn('⚠️ Nenhuma voz disponível ainda');
+                return;
+            }
+            
             // Procurar voz em português para modo normal
             this.voices.normal = availableVoices.find(voice => 
                 voice.lang.includes('pt-BR') && voice.name.includes('Google')
             ) || availableVoices.find(voice => 
                 voice.lang.includes('pt-BR')
+            ) || availableVoices.find(voice =>
+                voice.lang.includes('pt')
             ) || availableVoices[0];
             
             // Para voz demoníaca, preferir uma voz masculina grave
@@ -104,17 +191,27 @@ class DelphosVoiceSystem {
                  voice.name.toLowerCase().includes('masculino'))
             ) || this.voices.normal;
             
+            this.voicesLoaded = true;
+            
             console.log('🔊 Vozes carregadas:', {
                 normal: this.voices.normal?.name,
-                demonic: this.voices.demonic?.name
+                demonic: this.voices.demonic?.name,
+                total: availableVoices.length
             });
         };
         
         // Carregar vozes quando disponíveis
-        if (this.speechSynthesis.getVoices().length > 0) {
+        const voices = this.speechSynthesis.getVoices();
+        if (voices.length > 0) {
             setVoices();
         } else {
-            this.speechSynthesis.onvoiceschanged = setVoices;
+            // Tentar novamente após um pequeno delay
+            setTimeout(() => {
+                const voicesRetry = this.speechSynthesis.getVoices();
+                if (voicesRetry.length > 0) {
+                    setVoices();
+                }
+            }, 100);
         }
     }
     
@@ -229,76 +326,154 @@ class DelphosVoiceSystem {
         }
     }
     
-    // Sintetizar fala
-    speak(text, isUnrestricted = false) {
-        console.log(`🔊 speak chamado: "${text.substring(0, 50)}..." (modo ${isUnrestricted ? 'demoníaco' : 'normal'})`);
+    // Sintetizar fala - agora com suporte para Eleven Labs
+    async speak(text, isUnrestricted = false) {
+        console.log(`🔊 speak chamado: "${text.substring(0, 50)}..." (modo ${isUnrestricted ? 'demoníaco' : 'normal'}, TTS: ${this.ttsMode})`);
         
-        return new Promise((resolve) => {
-            if (!this.speechSynthesis) {
-                console.error('❌ Síntese de voz não disponível');
-                alert('Síntese de voz não está disponível no seu navegador.');
-                resolve();
-                return;
-            }
-            
-            // Verificar se as vozes foram carregadas
-            if (!this.voices.normal) {
-                console.warn('⚠️ Vozes ainda não carregadas, tentando carregar...');
-                this.loadVoices();
-                // Tentar novamente após um delay
-                setTimeout(() => this.speak(text, isUnrestricted).then(resolve), 500);
-                return;
-            }
-            
-            // Parar qualquer fala anterior
-            this.stopSpeaking();
-            
-            const utterance = new SpeechSynthesisUtterance(text);
-            
-            // Configurar voz baseada no modo
-            if (isUnrestricted) {
-                utterance.voice = this.voices.demonic;
-                utterance.pitch = this.demonicEffects.pitch;
-                utterance.rate = this.demonicEffects.rate;
-                utterance.volume = this.demonicEffects.volume;
-                
-                // Adicionar efeitos extras se possível
-                this.applyDemonicEffects(utterance);
-            } else {
-                utterance.voice = this.voices.normal;
-                utterance.pitch = 1.0;
-                utterance.rate = 1.0;
-                utterance.volume = 1.0;
-            }
-            
-            utterance.lang = 'pt-BR';
-            
-            utterance.onstart = () => {
+        // Parar qualquer fala anterior
+        this.stopSpeaking();
+        
+        // Usar Eleven Labs se disponível e configurado
+        if (this.ttsMode === 'elevenlabs' && this.elevenLabsTTS) {
+            try {
                 this.isSpeaking = true;
                 this.updateUI('speaking');
-                console.log('🔊 Falando' + (isUnrestricted ? ' (modo demoníaco)' : '') + '...');
-            };
-            
-            utterance.onend = () => {
+                
+                await this.elevenLabsTTS.speak(text, isUnrestricted);
+                
                 this.isSpeaking = false;
                 this.updateUI('idle');
-                resolve();
                 
                 // Reiniciar escuta se em modo conversacional
                 if (this.autoListen) {
                     setTimeout(() => this.startListening(), 500);
                 }
-            };
+                
+                return;
+            } catch (error) {
+                console.error('❌ Erro no Eleven Labs, voltando para TTS nativo:', error);
+                this.ttsMode = 'native';
+                // Continua para usar TTS nativo como fallback
+            }
+        }
+        
+        // Usar TTS nativo
+        return new Promise((resolve, reject) => {
+            if (!this.speechSynthesis) {
+                console.error('❌ Síntese de voz não disponível');
+                reject(new Error('Síntese de voz não está disponível no seu navegador.'));
+                return;
+            }
             
-            utterance.onerror = (event) => {
-                console.error('Erro na síntese:', event);
-                this.isSpeaking = false;
-                this.updateUI('error');
-                resolve();
-            };
+            // Verificar se as vozes foram carregadas
+            if (!this.voicesLoaded || !this.voices.normal) {
+                console.warn('⚠️ Vozes ainda não carregadas, tentando carregar...');
+                this.loadVoices();
+                
+                // Tentar novamente após um delay
+                setTimeout(() => {
+                    this.speak(text, isUnrestricted)
+                        .then(resolve)
+                        .catch(reject);
+                }, 500);
+                return;
+            }
             
-            this.speechSynthesis.speak(utterance);
+            try {
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                // Configurar voz baseada no modo
+                if (isUnrestricted && this.voices.demonic) {
+                    utterance.voice = this.voices.demonic;
+                    utterance.pitch = this.demonicEffects.pitch;
+                    utterance.rate = this.demonicEffects.rate;
+                    utterance.volume = this.demonicEffects.volume;
+                    
+                    // Adicionar efeitos extras se possível
+                    this.applyDemonicEffects(utterance);
+                } else if (this.voices.normal) {
+                    utterance.voice = this.voices.normal;
+                    utterance.pitch = 1.0;
+                    utterance.rate = 1.0;
+                    utterance.volume = 1.0;
+                }
+                
+                utterance.lang = 'pt-BR';
+                
+                utterance.onstart = () => {
+                    this.isSpeaking = true;
+                    this.updateUI('speaking');
+                    console.log('🔊 Iniciando fala' + (isUnrestricted ? ' (modo demoníaco)' : '') + '...');
+                };
+                
+                utterance.onend = () => {
+                    this.isSpeaking = false;
+                    this.updateUI('idle');
+                    console.log('✅ Fala concluída');
+                    resolve();
+                    
+                    // Reiniciar escuta se em modo conversacional
+                    if (this.autoListen) {
+                        setTimeout(() => this.startListening(), 500);
+                    }
+                };
+                
+                utterance.onerror = (event) => {
+                    console.error('❌ Erro na síntese:', event.error, event);
+                    this.isSpeaking = false;
+                    this.updateUI('error', event.error);
+                    
+                    // Tentar novamente com configurações básicas se falhar
+                    if (event.error === 'synthesis-failed' || event.error === 'synthesis-unavailable') {
+                        console.log('🔄 Tentando com configurações básicas...');
+                        const basicUtterance = new SpeechSynthesisUtterance(text);
+                        basicUtterance.lang = 'pt-BR';
+                        
+                        basicUtterance.onend = () => {
+                            console.log('✅ Fala básica concluída');
+                            resolve();
+                        };
+                        
+                        basicUtterance.onerror = () => {
+                            reject(new Error('Falha na síntese de voz'));
+                        };
+                        
+                        this.speechSynthesis.speak(basicUtterance);
+                    } else {
+                        reject(new Error(`Erro na síntese: ${event.error}`));
+                    }
+                };
+                
+                // Adicionar à fila e processar
+                this.utteranceQueue.push(utterance);
+                this.processUtteranceQueue();
+                
+            } catch (error) {
+                console.error('❌ Erro ao criar utterance:', error);
+                reject(error);
+            }
         });
+    }
+    
+    // Processar fila de utterances
+    processUtteranceQueue() {
+        if (this.utteranceQueue.length === 0) return;
+        
+        const utterance = this.utteranceQueue.shift();
+        
+        // Garantir que o speechSynthesis esteja pronto
+        if (this.speechSynthesis.speaking || this.speechSynthesis.pending) {
+            this.speechSynthesis.cancel();
+        }
+        
+        // Pequeno delay para garantir que o sistema esteja pronto
+        setTimeout(() => {
+            try {
+                this.speechSynthesis.speak(utterance);
+            } catch (error) {
+                console.error('❌ Erro ao falar:', error);
+            }
+        }, 50);
     }
     
     // Aplicar efeitos demoníacos adicionais
@@ -322,11 +497,17 @@ class DelphosVoiceSystem {
     
     // Parar síntese
     stopSpeaking() {
-        if (this.isSpeaking) {
+        // Parar TTS nativo
+        if (this.speechSynthesis) {
             this.speechSynthesis.cancel();
-            this.isSpeaking = false;
-            this.updateUI('idle');
+            this.utteranceQueue = [];
         }
+        
+        // Parar Eleven Labs se estiver tocando
+        // (Eleven Labs usa elementos <audio> que param automaticamente quando um novo é criado)
+        
+        this.isSpeaking = false;
+        this.updateUI('idle');
     }
     
     // Lidar com entrada de voz
@@ -406,6 +587,19 @@ class DelphosVoiceSystem {
     setVoiceMode(mode) {
         this.voiceMode = mode;
         console.log(`🎭 Modo de voz alterado para: ${mode}`);
+    }
+
+    // Obter status do sistema
+    getStatus() {
+        return {
+            ttsMode: this.ttsMode,
+            elevenLabsConfigured: !!this.elevenLabsTTS,
+            nativeTTSAvailable: !!this.speechSynthesis,
+            speechRecognitionAvailable: !!this.speechRecognition,
+            voicesLoaded: this.voicesLoaded,
+            isListening: this.isListening,
+            isSpeaking: this.isSpeaking
+        };
     }
 }
 

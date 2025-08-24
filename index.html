@@ -61,9 +61,21 @@
                     </select>
                 </div>
                 <div class="api-controls">
-                    <label>API Key:</label>
+                    <label>API Key OpenAI:</label>
                     <input type="password" id="api-key" placeholder="OpenAI API Key">
                     <button id="save-api-key">Salvar</button>
+                </div>
+                <div class="api-controls">
+                    <label>API Key Eleven Labs:</label>
+                    <input type="password" id="elevenlabs-key" placeholder="Eleven Labs API Key">
+                    <button id="save-elevenlabs-key">Salvar</button>
+                </div>
+                <div class="tts-controls">
+                    <label>Sistema TTS:</label>
+                    <select id="tts-mode-select">
+                        <option value="native">Nativo (Navegador)</option>
+                        <option value="elevenlabs">Eleven Labs</option>
+                    </select>
                 </div>
                 <button id="reset-chat">Resetar Chat</button>
             </div>
@@ -79,6 +91,7 @@
         </div>
     </div>
 
+    <script src="elevenlabs-tts.js"></script>
     <script src="voice-system.js"></script>
     <script src="app.js"></script>
 </body>

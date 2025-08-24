@@ -45,6 +45,9 @@ const saveApiKeyBtn = document.getElementById('save-api-key');
 const resetChatBtn = document.getElementById('reset-chat');
 const eldritchSymbols = document.getElementById('eldritch-symbols');
 const keywordsIndicator = document.getElementById('keywords-indicator');
+const elevenLabsKeyInput = document.getElementById('elevenlabs-key');
+const saveElevenLabsKeyBtn = document.getElementById('save-elevenlabs-key');
+const ttsModeSelect = document.getElementById('tts-mode-select');
 
 // Prompts por episódio
 const episodePrompts = {
@@ -150,10 +153,48 @@ function init() {
     });
     
     saveApiKeyBtn.addEventListener('click', () => {
-        apiKey = apiKeyInput.value;
+        apiKey = apiKeyInput.value.trim();
         localStorage.setItem('openai_api_key', apiKey);
         alert('API Key salva!');
     });
+
+    // Salvar API key do Eleven Labs
+    if (saveElevenLabsKeyBtn) {
+        saveElevenLabsKeyBtn.addEventListener('click', () => {
+            const elevenLabsKey = elevenLabsKeyInput.value.trim();
+            if (voiceSystem) {
+                voiceSystem.setElevenLabsApiKey(elevenLabsKey);
+                alert('API Key do Eleven Labs salva!');
+                
+                // Atualizar seletor de TTS
+                if (elevenLabsKey && ttsModeSelect) {
+                    ttsModeSelect.value = 'elevenlabs';
+                    voiceSystem.setTTSMode('elevenlabs');
+                }
+            }
+        });
+    }
+
+    // Alterar modo TTS
+    if (ttsModeSelect) {
+        // Configurar valor inicial baseado no sistema de voz
+        setTimeout(() => {
+            if (voiceSystem && voiceSystem.getStatus) {
+                const status = voiceSystem.getStatus();
+                ttsModeSelect.value = status.ttsMode;
+            }
+        }, 1000);
+        
+        ttsModeSelect.addEventListener('change', (e) => {
+            if (voiceSystem) {
+                const success = voiceSystem.setTTSMode(e.target.value);
+                if (!success) {
+                    alert('Configure a API Key do Eleven Labs primeiro!');
+                    ttsModeSelect.value = 'native';
+                }
+            }
+        });
+    }
     
     episodeSelect.addEventListener('change', (e) => {
         changeEpisode(parseInt(e.target.value));
