@@ -76,6 +76,11 @@ class AdvancedSpeechToSpeech {
     
     async initialize() {
         try {
+            // Verificar se está em contexto seguro (HTTPS ou localhost)
+            if (!this.isSecureContext()) {
+                throw new Error('O sistema de voz requer HTTPS ou localhost para funcionar. Por favor, acesse via https:// ou http://localhost');
+            }
+            
             // Inicializar Web Audio API
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             
@@ -97,6 +102,59 @@ class AdvancedSpeechToSpeech {
             console.error('❌ Erro ao inicializar sistema:', error);
             throw error;
         }
+    }
+    
+    // Verificar se está em contexto seguro
+    isSecureContext() {
+        return window.isSecureContext || 
+               window.location.hostname === 'localhost' || 
+               window.location.hostname === '127.0.0.1' ||
+               window.location.protocol === 'https:';
+    }
+    
+    // Verificar permissões do microfone
+    async checkMicrophonePermission() {
+        try {
+            // Verificar se a API de permissões está disponível
+            if (navigator.permissions && navigator.permissions.query) {
+                const result = await navigator.permissions.query({ name: 'microphone' });
+                console.log('📱 Status da permissão do microfone:', result.state);
+                
+                // Adicionar listener para mudanças de permissão
+                result.addEventListener('change', () => {
+                    console.log('📱 Permissão do microfone mudou para:', result.state);
+                    if (result.state === 'denied') {
+                        this.handlePermissionDenied();
+                    }
+                });
+                
+                return result.state;
+            }
+            // Se a API de permissões não estiver disponível, tentar acessar diretamente
+            return 'prompt';
+        } catch (error) {
+            console.warn('⚠️ Não foi possível verificar permissões:', error);
+            return 'prompt';
+        }
+    }
+    
+    // Lidar com permissão negada
+    handlePermissionDenied() {
+        const errorMsg = `
+🎤 Permissão do Microfone Negada
+
+Para usar o sistema de voz, você precisa:
+1. Permitir o acesso ao microfone quando solicitado
+2. Ou verificar as configurações do navegador:
+   • Chrome: chrome://settings/content/microphone
+   • Firefox: about:preferences#privacy
+   • Edge: edge://settings/content/microphone
+3. Certifique-se de que o site não está bloqueado
+
+Após permitir o acesso, recarregue a página.
+        `;
+        console.error(errorMsg);
+        throw new Error('Permissão do microfone foi negada. Por favor, permita o acesso ao microfone nas configurações do navegador.');
     }
     
     setupSpeechRecognition() {
