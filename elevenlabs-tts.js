@@ -85,6 +85,12 @@ class ElevenLabsTTS {
             return this.audioCache.get(cacheKey);
         }
         
+        console.log('🔊 Fazendo requisição para Eleven Labs API...', {
+            voiceId: selectedVoiceId,
+            modelId,
+            textLength: text.length
+        });
+        
         try {
             const response = await fetch(
                 `${this.baseUrl}/text-to-speech/${selectedVoiceId}`,
@@ -103,9 +109,40 @@ class ElevenLabsTTS {
                 }
             );
             
+            console.log('📡 Resposta recebida:', {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries())
+            });
+            
             if (!response.ok) {
-                const error = await response.text();
-                throw new Error(`Erro na API Eleven Labs: ${response.status} - ${error}`);
+                let errorDetail;
+                const contentType = response.headers.get('content-type');
+                
+                if (contentType && contentType.includes('application/json')) {
+                    errorDetail = await response.json();
+                } else {
+                    errorDetail = await response.text();
+                }
+                
+                console.error('❌ Erro da API:', errorDetail);
+                
+                // Mensagens de erro mais específicas
+                let errorMessage = `Erro ${response.status}: `;
+                
+                if (response.status === 401) {
+                    errorMessage += 'API Key inválida ou expirada';
+                } else if (response.status === 403) {
+                    errorMessage += 'Acesso negado - verifique as permissões da sua API Key';
+                } else if (response.status === 422) {
+                    errorMessage += 'Dados inválidos - ' + (errorDetail.detail || JSON.stringify(errorDetail));
+                } else if (response.status === 429) {
+                    errorMessage += 'Limite de requisições excedido - aguarde um momento';
+                } else {
+                    errorMessage += errorDetail.detail || errorDetail || response.statusText;
+                }
+                
+                throw new Error(errorMessage);
             }
             
             // Converter resposta em blob de áudio
