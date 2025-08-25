@@ -10,7 +10,7 @@ class ElevenLabsSpeechToSpeech {
         
         // Configurações de voz
         this.voiceId = '21m00Tcm4TlvDq8ikWAM'; // Rachel
-        this.modelId = 'eleven_multilingual_v2';
+        this.modelId = 'eleven_multilingual_sts_v2'; // Modelo específico para speech-to-speech
         
         // Estado do sistema
         this.isRecording = false;
@@ -169,8 +169,29 @@ class ElevenLabsSpeechToSpeech {
             );
             
             if (!response.ok) {
-                const error = await response.text();
-                throw new Error(`API Error ${response.status}: ${error}`);
+                const errorText = await response.text();
+                let errorMessage = `Erro na API ElevenLabs (${response.status})`;
+                
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    if (errorJson.detail?.message) {
+                        errorMessage = errorJson.detail.message;
+                        
+                        // Traduzir mensagens comuns
+                        if (errorMessage.includes('model can not be used for voice conversion')) {
+                            errorMessage = 'O modelo selecionado não suporta conversão de voz. Usando modelo compatível.';
+                        } else if (errorMessage.includes('quota_exceeded')) {
+                            errorMessage = 'Limite de uso da API excedido. Verifique sua conta ElevenLabs.';
+                        } else if (errorMessage.includes('invalid_api_key')) {
+                            errorMessage = 'API Key inválida. Verifique sua chave do ElevenLabs.';
+                        }
+                    }
+                } catch (e) {
+                    // Se não for JSON, usa o texto como está
+                    errorMessage += `: ${errorText}`;
+                }
+                
+                throw new Error(errorMessage);
             }
             
             // Obter áudio de resposta
@@ -247,6 +268,13 @@ class ElevenLabsSpeechToSpeech {
      */
     setModel(modelId) {
         this.modelId = modelId;
+    }
+    
+    /**
+     * Atualiza a API Key do ElevenLabs
+     */
+    setElevenLabsKey(apiKey) {
+        this.apiKey = apiKey;
     }
     
     /**
