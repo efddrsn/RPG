@@ -26,7 +26,7 @@ app.post('/api/chat', async (req, res) => {
     const data = await response.json();
     res.json({ reply: data.choices?.[0]?.message?.content || '' });
   } catch (err) {
-    console.error(err);
+    console.error('Error in /api/chat:', err?.message || err);
     res.status(500).json({ error: 'Failed to contact OpenAI' });
   }
 });
