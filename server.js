@@ -19,7 +19,7 @@ app.post('/api/chat', async (req, res) => {
           ...messageHistory,
           { role: 'user', content: userMessage }
         ],
-        temperature: isUnrestrictedMode ? 1.2 : 0.8,
+        temperature: isUnrestrictedMode ? 1.0 : 0.8,
         max_tokens: 200
       })
     });
