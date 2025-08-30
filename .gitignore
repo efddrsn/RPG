@@ -34,7 +34,6 @@ yarn-error.log*
 Thumbs.db
 
 # Build
-dist/
 build/
 .cache/
 
