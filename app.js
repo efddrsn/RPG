@@ -45,8 +45,6 @@ const saveApiKeyBtn = document.getElementById('save-api-key');
 const resetChatBtn = document.getElementById('reset-chat');
 const eldritchSymbols = document.getElementById('eldritch-symbols');
 const keywordsIndicator = document.getElementById('keywords-indicator');
-const elevenLabsKeyInput = document.getElementById('elevenlabs-key');
-const saveElevenLabsKeyBtn = document.getElementById('save-elevenlabs-key');
 const ttsModeSelect = document.getElementById('tts-mode-select');
 
 // Prompts por episódio
@@ -146,11 +144,6 @@ async function init() {
             apiKeyInput.value = '••••••••'; // Mostra que a key está carregada
         }
         
-        const elevenLabsKey = await secretsManager.getElevenLabsKey();
-        if (elevenLabsKey) {
-            elevenLabsKeyInput.value = '••••••••'; // Mostra que a key está carregada
-            localStorage.setItem('elevenlabs_api_key', elevenLabsKey); // Para compatibilidade
-        }
     } catch (error) {
         console.error('Erro ao carregar secrets:', error);
         // Fallback para localStorage
@@ -176,23 +169,6 @@ async function init() {
         alert('API Key salva!');
     });
 
-    // Salvar API key do Eleven Labs
-    if (saveElevenLabsKeyBtn) {
-        saveElevenLabsKeyBtn.addEventListener('click', () => {
-            const elevenLabsKey = elevenLabsKeyInput.value.trim();
-            if (voiceSystem) {
-                voiceSystem.setElevenLabsApiKey(elevenLabsKey);
-                alert('API Key do Eleven Labs salva!');
-                
-                // Atualizar seletor de TTS
-                if (elevenLabsKey && ttsModeSelect) {
-                    ttsModeSelect.value = 'elevenlabs';
-                    voiceSystem.setTTSMode('elevenlabs');
-                }
-            }
-        });
-    }
-
     // Alterar modo TTS
     if (ttsModeSelect) {
         // Configurar valor inicial baseado no sistema de voz
@@ -207,7 +183,7 @@ async function init() {
             if (voiceSystem) {
                 const success = voiceSystem.setTTSMode(e.target.value);
                 if (!success) {
-                    alert('Configure a API Key do Eleven Labs primeiro!');
+                    alert('Configure a API Key da OpenAI primeiro!');
                     ttsModeSelect.value = 'native';
                 }
             }
@@ -448,24 +424,24 @@ let ttsEnabled = true; // Controle para ativar/desativar respostas de voz
 async function initVoiceSystem() {
     console.log('🎙️ Iniciando sistema Speech-to-Speech...');
     try {
-        // Verificar se temos a chave do ElevenLabs
-        let elevenLabsKey = localStorage.getItem('elevenlabs_api_key');
-        
+        // Verificar se temos a chave da OpenAI
+        let openaiKey = apiKey || localStorage.getItem('openai_api_key');
+
         // Tentar obter dos secrets do GitHub se não estiver no localStorage
-        if (!elevenLabsKey) {
+        if (!openaiKey) {
             try {
-                elevenLabsKey = await secretsManager.getElevenLabsKey();
-                if (elevenLabsKey) {
-                    localStorage.setItem('elevenlabs_api_key', elevenLabsKey); // Para compatibilidade
+                openaiKey = await secretsManager.getOpenAIKey();
+                if (openaiKey) {
+                    localStorage.setItem('openai_api_key', openaiKey);
                 }
             } catch (error) {
-                console.error('Erro ao obter Eleven Labs key:', error);
+                console.error('Erro ao obter OpenAI key:', error);
             }
         }
-        
-        // Criar novo sistema Speech-to-Speech
-        if (elevenLabsKey) {
-            speechSystem = new ElevenLabsSpeechToSpeech(elevenLabsKey);
+
+        // Criar novo sistema de streaming de voz
+        if (openaiKey) {
+            speechSystem = new OpenAIRealtimeVoice(openaiKey);
             
             // Configurar callbacks
             speechSystem.onProcessingStart = () => {
@@ -487,13 +463,13 @@ async function initVoiceSystem() {
             };
             
             speechSystem.onError = (error) => {
-                console.error('❌ Erro no Speech-to-Speech:', error);
+                console.error('❌ Erro no streaming de voz:', error);
                 addMessage('Erro no sistema de voz: ' + error.message, 'system');
             };
-            
-            console.log('✅ Sistema Speech-to-Speech criado');
+
+            console.log('✅ Sistema de streaming de voz criado');
         } else {
-            console.warn('⚠️ API Key do Eleven Labs não encontrada');
+            console.warn('⚠️ API Key da OpenAI não encontrada');
         }
         
 
