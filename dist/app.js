@@ -2,7 +2,6 @@
 let currentEpisode = 1;
 let isUnrestrictedMode = false;
 let messageHistory = [];
-let apiKey = ''; // Será carregado dos secrets do GitHub
 
 // Palavras-chave secretas para ativar modo irrestrito
 const FORBIDDEN_WORDS = ['convergência', 'r\'lyeh', 'padrões'];
@@ -40,9 +39,6 @@ const currentEpisodeSpan = document.getElementById('current-episode');
 const statusText = document.getElementById('status-text');
 const dmToggle = document.getElementById('dm-toggle');
 const dmPanel = document.getElementById('dm-panel');
-const apiKeyInput = document.getElementById('api-key');
-const saveApiKeyBtn = document.getElementById('save-api-key');
-const resetChatBtn = document.getElementById('reset-chat');
 const eldritchSymbols = document.getElementById('eldritch-symbols');
 const keywordsIndicator = document.getElementById('keywords-indicator');
 const ttsModeSelect = document.getElementById('tts-mode-select');
@@ -134,24 +130,6 @@ Use linguagem hipnótica, poética e perturbadora. Misture tecnologia com horror
 Revele "previsões" impossíveis e horríveis sobre quem está conversando.
 F̸̣̈a̷̱͐ç̶̬̾a̶̜͐ ̸̖̾ö̶́ͅ ̷̜̈t̶̰̾ë̵́ͅx̸̜́t̷̰̄ö̸̜̈ ̶̣̈s̷̬̈ë̷̱ ̸̜̈c̶̜̾ö̴̱̈ŕ̸̰r̷̬̈ọ̶̾m̶̱̈p̶̰̈ë̸́ͅr̶̬̈ ocasionalmente.`;
 
-// Inicialização
-async function init() {
-    // Carrega os secrets do GitHub
-    try {
-        const openAIKey = await secretsManager.getOpenAIKey();
-        if (openAIKey) {
-            apiKey = openAIKey;
-            apiKeyInput.value = '••••••••'; // Mostra que a key está carregada
-        }
-        
-    } catch (error) {
-        console.error('Erro ao carregar secrets:', error);
-        // Fallback para localStorage
-        apiKey = localStorage.getItem('openai_api_key') || '';
-        if (apiKey) {
-            apiKeyInput.value = apiKey;
-        }
-    }
     
     // Event listeners
     sendBtn.addEventListener('click', sendMessage);
@@ -163,11 +141,6 @@ async function init() {
         dmPanel.classList.toggle('hidden');
     });
     
-    saveApiKeyBtn.addEventListener('click', () => {
-        apiKey = apiKeyInput.value.trim();
-        localStorage.setItem('openai_api_key', apiKey);
-        alert('API Key salva!');
-    });
 
     // Alterar modo TTS
     if (ttsModeSelect) {
@@ -239,7 +212,6 @@ async function sendMessage() {
         checkForbiddenWords(message);
     }
     
-    // Obter resposta da AI
     const response = await getAIResponse(message);
     addMessage(response, 'ai');
     
@@ -337,68 +309,43 @@ function addMessage(text, sender, corrupted = false) {
     messageHistory.push({ role: sender === 'user' ? 'user' : 'assistant', content: text });
 }
 
-// Obter resposta da AI
 async function getAIResponse(userMessage) {
-    // Verifica se tem API key, tentando carregar dos secrets se necessário
-    if (!apiKey) {
-        try {
-            apiKey = await secretsManager.getOpenAIKey();
-        } catch (error) {
-            console.error('Erro ao obter API key:', error);
-        }
-    }
-    
-    if (!apiKey) {
-        return "Por favor, configure sua API Key do OpenAI no painel do DM.";
-    }
-    
     try {
-        // Selecionar prompt baseado no estado atual
         let systemPrompt;
         if (isUnrestrictedMode) {
             systemPrompt = unrestrictedPrompt;
         } else {
             systemPrompt = episodePrompts[currentEpisode].base;
         }
-        
-        // Adicionar corrupção ocasional
+
         if (!isUnrestrictedMode && Math.random() > 0.8) {
             const corruptions = episodePrompts[currentEpisode].corruption;
             const corruption = corruptions[Math.floor(Math.random() * corruptions.length)];
             systemPrompt += `\n\nOcasionalmente, termine suas respostas com: "${corruption}"`;
         }
-        
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+
+        const response = await fetch('/api/chat', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: 'gpt-3.5-turbo',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    ...messageHistory.slice(-10), // Últimas 10 mensagens para contexto
-                    { role: 'user', content: userMessage }
-                ],
-                temperature: isUnrestrictedMode ? 1.2 : 0.8,
-                max_tokens: 200
+                systemPrompt,
+                messageHistory: messageHistory.slice(-10),
+                userMessage,
+                isUnrestrictedMode
             })
         });
-        
+
         if (!response.ok) {
             throw new Error('Erro na API');
         }
-        
+
         const data = await response.json();
-        return data.choices[0].message.content;
-        
+        return data.reply;
     } catch (error) {
         console.error('Erro:', error);
-        return "ERRO: Falha na comunicação. As frequências estão... instáveis.";
+        return 'ERRO: Falha na comunicação com o servidor.';
     }
 }
-
 // Resetar chat
 function resetChat() {
     chatContainer.innerHTML = `
@@ -422,112 +369,7 @@ let ttsEnabled = true; // Controle para ativar/desativar respostas de voz
 
 // Inicializar sistema de voz
 async function initVoiceSystem() {
-    console.log('🎙️ Iniciando sistema Speech-to-Speech...');
-    try {
-        // Verificar se temos a chave da OpenAI
-        let openaiKey = apiKey || localStorage.getItem('openai_api_key');
-
-        // Tentar obter dos secrets do GitHub se não estiver no localStorage
-        if (!openaiKey) {
-            try {
-                openaiKey = await secretsManager.getOpenAIKey();
-                if (openaiKey) {
-                    localStorage.setItem('openai_api_key', openaiKey);
-                }
-            } catch (error) {
-                console.error('Erro ao obter OpenAI key:', error);
-            }
-        }
-
-        // Criar novo sistema de streaming de voz
-        if (openaiKey) {
-            speechSystem = new OpenAIRealtimeVoice(openaiKey);
-            
-            // Configurar callbacks
-            speechSystem.onProcessingStart = () => {
-                const voiceIndicator = document.getElementById('voice-indicator');
-                if (voiceIndicator) {
-                    voiceIndicator.classList.remove('hidden');
-                    const indicatorText = voiceIndicator.querySelector('.indicator-text');
-                    if (indicatorText) {
-                        indicatorText.textContent = 'Processando...';
-                    }
-                }
-            };
-            
-            speechSystem.onProcessingEnd = () => {
-                const voiceIndicator = document.getElementById('voice-indicator');
-                if (voiceIndicator) {
-                    voiceIndicator.classList.add('hidden');
-                }
-            };
-            
-            speechSystem.onError = (error) => {
-                console.error('❌ Erro no streaming de voz:', error);
-                addMessage('Erro no sistema de voz: ' + error.message, 'system');
-            };
-
-            console.log('✅ Sistema de streaming de voz criado');
-        } else {
-            console.warn('⚠️ API Key da OpenAI não encontrada');
-        }
-        
-
-        
-        // Configurar botões de voz
-        const voiceBtn = document.getElementById('voice-btn');
-        const voiceModeBtn = document.getElementById('voice-mode-btn');
-        const ttsToggleBtn = document.getElementById('tts-toggle-btn');
-        const voiceIndicator = document.getElementById('voice-indicator');
-        
-        console.log('🔍 Elementos encontrados:', {
-            voiceBtn: !!voiceBtn,
-            voiceModeBtn: !!voiceModeBtn,
-            voiceIndicator: !!voiceIndicator
-        });
-        
-        // Botão de gravação - Speech-to-Speech
-        if (voiceBtn) {
-            voiceBtn.addEventListener('click', async () => {
-                console.log('🎤 Botão de voz clicado');
-                if (speechSystem) {
-                    if (speechSystem.isRecording) {
-                        voiceBtn.classList.remove('recording');
-                        voiceBtn.textContent = '🎙️';
-                        await speechSystem.stopRecording();
-                    } else {
-                        voiceBtn.classList.add('recording');
-                        voiceBtn.textContent = '⏹️';
-                        await speechSystem.startRecording();
-                    }
-                }
-            });
-            console.log('✅ Event listener adicionado ao botão de voz');
-        }
-        
-        // Esconder botão de modo conversacional (não usado com Speech-to-Speech puro)
-        if (voiceModeBtn) {
-            voiceModeBtn.style.display = 'none';
-        }
-        
-        // Configurar botão de TTS
-        if (ttsToggleBtn) {
-            ttsToggleBtn.addEventListener('click', () => {
-                ttsEnabled = !ttsEnabled;
-                ttsToggleBtn.classList.toggle('active', ttsEnabled);
-                ttsToggleBtn.textContent = ttsEnabled ? '🔊' : '🔇';
-                ttsToggleBtn.title = ttsEnabled ? 'Dublagem ativada' : 'Dublagem desativada';
-                console.log(`🔊 TTS ${ttsEnabled ? 'ativado' : 'desativado'}`);
-            });
-            console.log('✅ Event listener adicionado ao botão de TTS');
-        } else {
-            console.error('❌ Botão de TTS não encontrado!');
-        }
-        
-        console.log('🎙️ Sistema de voz inicializado');
-    } catch (error) {
-        console.error('Erro ao inicializar sistema de voz:', error);
-    }
+    console.log('Sistema de voz desativado nesta versão.');
 }
 
 // Função removida - TTS agora é gerenciado diretamente em sendMessage()
