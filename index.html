@@ -289,7 +289,7 @@
         <!-- Configuração de API -->
         <div class="api-config" id="apiConfig">
             <h3>Configuração</h3>
-            <input type="password" id="elevenLabsKey" placeholder="API Key do ElevenLabs (opcional)">
+            <input type="password" id="openAIKey" placeholder="API Key da OpenAI">
             <button onclick="saveConfig()">Salvar Configuração</button>
         </div>
         
@@ -320,16 +320,15 @@
         <div class="conversation-area" id="conversationArea">
             <div class="message system">
                 <div>Bem-vindo ao modo contínuo da Delphos AI</div>
-                <div>Configure sua API Key do ElevenLabs para melhor qualidade de voz (opcional)</div>
+                <div>Configure sua API Key da OpenAI para habilitar respostas por voz</div>
             </div>
         </div>
     </div>
-    
+
     <!-- Scripts -->
     <script src="secrets-config.js"></script>
     <script src="github-secrets.js"></script>
-    <script src="elevenlabs-speech-to-speech.js"></script>
-    <script src="elevenlabs-enhanced.js"></script>
+    <script src="openai-realtime-voice.js"></script>
     <script>
         // Estado global
         let speechSystem = null;
@@ -348,33 +347,33 @@
         window.addEventListener('DOMContentLoaded', async () => {
             try {
                 // Verificar API Key - primeiro tenta GitHub secrets, depois localStorage
-                let elevenLabsKey = null;
+                let openaiKey = null;
                 
                 try {
-                    elevenLabsKey = await secretsManager.getElevenLabsKey();
-                    if (elevenLabsKey) {
-                        document.getElementById('elevenLabsKey').value = '••••••••';
+                    openaiKey = await secretsManager.getOpenAIKey();
+                    if (openaiKey) {
+                        document.getElementById('openAIKey').value = '••••••••';
                         apiConfig.style.display = 'none';
-                        localStorage.setItem('elevenlabs_api_key', elevenLabsKey); // Para compatibilidade
+                        localStorage.setItem('openai_api_key', openaiKey);
                     }
                 } catch (error) {
                     console.error('Erro ao carregar secrets do GitHub:', error);
                     // Fallback para localStorage
-                    elevenLabsKey = localStorage.getItem('elevenlabs_api_key');
-                    if (elevenLabsKey) {
-                        document.getElementById('elevenLabsKey').value = elevenLabsKey;
+                    openaiKey = localStorage.getItem('openai_api_key');
+                    if (openaiKey) {
+                        document.getElementById('openAIKey').value = openaiKey;
                         apiConfig.style.display = 'none';
                     }
                 }
-                
-                // Criar sistema Speech-to-Speech
-                if (elevenLabsKey) {
-                    speechSystem = new ElevenLabsSpeechToSpeech(elevenLabsKey);
-                    
+
+                // Criar sistema de streaming de voz
+                if (openaiKey) {
+                    speechSystem = new OpenAIRealtimeVoice(openaiKey);
+
                     // Configurar callbacks
                     speechSystem.onProcessingStart = () => {
                         updateUIStatus('processing');
-                        updateStatusMessage('Processando Speech-to-Speech...');
+                        updateStatusMessage('Processando áudio...');
                     };
                     
                     speechSystem.onProcessingEnd = () => {
@@ -397,7 +396,7 @@
                         console.log('Áudio pronto:', audioUrl);
                     };
                 } else {
-                    addMessage('error', 'API Key do Eleven Labs não encontrada');
+                    addMessage('error', 'API Key da OpenAI não encontrada');
                 }
                 
 
@@ -441,12 +440,12 @@
         
         // Salvar configuração
         async function saveConfig() {
-            let apiKey = document.getElementById('elevenLabsKey').value;
+            let apiKey = document.getElementById('openAIKey').value;
             
             // Se o campo estiver com bullets, tenta pegar dos secrets
             if (apiKey === '••••••••') {
                 try {
-                    apiKey = await secretsManager.getElevenLabsKey();
+                    apiKey = await secretsManager.getOpenAIKey();
                 } catch (error) {
                     console.error('Erro ao obter API key:', error);
                     addMessage('system', 'Erro ao carregar configuração dos secrets do GitHub.');
@@ -455,9 +454,9 @@
             }
             
             if (apiKey) {
-                localStorage.setItem('elevenlabs_api_key', apiKey);
+                localStorage.setItem('openai_api_key', apiKey);
                 if (speechSystem) {
-                    speechSystem.setElevenLabsKey(apiKey);
+                    speechSystem.setOpenAIKey(apiKey);
                 }
                 apiConfig.style.display = 'none';
                 addMessage('system', 'Configuração salva com sucesso!');
