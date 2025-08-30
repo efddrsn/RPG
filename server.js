@@ -3,8 +3,21 @@ import express from 'express';
 const app = express();
 app.use(express.json());
 
-app.post('/api/chat', async (req, res) => {
   const { systemPrompt, messageHistory = [], userMessage, isUnrestrictedMode } = req.body;
+
+  // Input validation
+  if (typeof systemPrompt !== 'string' || systemPrompt.trim() === '') {
+    return res.status(400).json({ error: 'systemPrompt is required and must be a non-empty string.' });
+  }
+  if (!Array.isArray(messageHistory)) {
+    return res.status(400).json({ error: 'messageHistory must be an array.' });
+  }
+  if (typeof userMessage !== 'string' || userMessage.trim() === '') {
+    return res.status(400).json({ error: 'userMessage is required and must be a non-empty string.' });
+  }
+  if (typeof isUnrestrictedMode !== 'undefined' && typeof isUnrestrictedMode !== 'boolean') {
+    return res.status(400).json({ error: 'isUnrestrictedMode must be a boolean if provided.' });
+  }
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
