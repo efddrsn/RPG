@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delphos AI</title>
+  <style>
+    body { font-family: sans-serif; background:#0a0a0a; color:#fff; display:flex; flex-direction:column; min-height:100vh; margin:0; }
+    header { padding:20px; text-align:center; border-bottom:2px solid #00ff88; background:#1a1a2e; }
+    .status { display:inline-block; padding:5px 15px; border-radius:20px; border:1px solid #00ff88; margin-top:10px; }
+    #chat { flex:1; padding:20px; overflow-y:auto; }
+    .message { margin-bottom:15px; padding:12px 16px; border-radius:10px; }
+    .message.user { background:rgba(0,255,136,0.2); text-align:right; }
+    .message.ai { background:rgba(255,255,255,0.1); }
+    .message.error { background:rgba(255,107,107,0.2); border:1px solid rgba(255,107,107,0.5); }
+    #input-area { display:flex; padding:20px; border-top:1px solid rgba(0,255,136,0.3); }
+    #input-area input { flex:1; padding:10px; border-radius:5px; border:1px solid #00ff88; background:#0f0f23; color:#fff; }
+    #input-area button { margin-left:10px; padding:10px 20px; background:#00ff88; border:none; color:#000; border-radius:5px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Delphos AI</h1>
+    <div class="status" id="status">Pronto</div>
+  </header>
+  <div id="chat"></div>
+  <div id="input-area">
+    <input id="message" type="text" placeholder="Digite sua mensagem...">
+    <button id="send">Enviar</button>
+  </div>
+  <script>
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('message');
+    const sendBtn = document.getElementById('send');
+    let history = [];
+
+    function addMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function send() {
+      const text = input.value.trim();
+      if (!text) return;
+      addMessage('user', text);
+      history.push({ role: 'user', content: text });
+      input.value = '';
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemPrompt: 'Você é a Delphos AI.',
+            messageHistory: history,
+            userMessage: text,
+            isUnrestrictedMode: false
+          })
+        });
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+        addMessage('ai', data.reply);
+        history.push({ role: 'assistant', content: data.reply });
+      } catch (err) {
+        console.error(err);
+        addMessage('error', 'ERRO: Falha na comunicação com o servidor.');
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    input.addEventListener('keypress', e => { if (e.key === 'Enter') send(); });
+  </script>
+</body>
+</html>
