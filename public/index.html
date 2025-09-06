@@ -6,23 +6,69 @@
     <title>Delfos - Demo de Voz</title>
     <style>
       :root { color-scheme: light dark; }
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #0b1020; color: #e6e9ef; }
-      .card { width: min(720px, 92vw); border: 1px solid #2a2f45; border-radius: 12px; padding: 20px; background: #0f152b; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; margin: 0; min-height: 100dvh; display: grid; place-items: center; background: var(--bg); color: var(--text); position: relative; overflow-x: hidden; }
+      /* THEME VARIABLES */
+      body.mode-normal {
+        --bg: #f7fafc;
+        --text: #0b1020;
+        --card-bg: #ffffff;
+        --border: #e2e8f0;
+        --accent: #2563eb;
+        --accent-2: #38bdf8;
+        --orb-base: #1d4ed8;
+        --orb-highlight: #3b82f6;
+        --orb-glow: rgba(59,130,246,.45);
+        --orb-wave: rgba(59,130,246,.30);
+      }
+      body.mode-unrestricted {
+        --bg: #0b1020;
+        --text: #e6e9ef;
+        --card-bg: #0f152b;
+        --border: #2a2f45;
+        --accent: #7b2cff;
+        --accent-2: #22d3ee;
+        --orb-base: #0a0f1e;
+        --orb-highlight: #232a44;
+        --orb-glow: rgba(2,6,23,.65);
+        --orb-wave: rgba(148,163,184,.18);
+      }
+      /* Ritual symbols background for unrestricted mode */
+      body.mode-unrestricted::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          radial-gradient(1000px 1000px at 50% -10%, rgba(123,44,255,.12), transparent 60%),
+          url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'><rect width='240' height='240' fill='none'/><g fill='%23ffffff' fill-opacity='0.06' font-size='20' font-family='ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'><text x='16' y='36'>⟡ ✶ ☽ ☉ ☿ ♄ ✴</text><text x='64' y='84'>✧ ⟁ ⊕ ⊗ ☌ ☍</text><text x='28' y='132'>☯ ✦ ⛤ ⛧ ✵ ✹</text><text x='92' y='180'>✷ ✴ ✹ ⍟ ⍣ ✶</text></g></svg>");
+        background-size: auto, 260px 260px;
+        background-repeat: no-repeat, repeat;
+        mix-blend-mode: screen;
+        opacity: .5;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .card { width: min(720px, 92vw); border: 1px solid var(--border); border-radius: 12px; padding: 20px; background: var(--card-bg); box-shadow: 0 10px 30px rgba(0,0,0,.15); position: relative; z-index: 1; }
       .title { margin: 0 0 6px; font-size: 20px; font-weight: 600; letter-spacing: .2px; }
       .subtitle { margin: 0 0 16px; font-size: 13px; opacity: .8; }
       .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
       .spacer { height: 10px; }
-      .toggle {
-        display: inline-flex; align-items: center; gap: 8px; border: 1px solid #313857; border-radius: 999px; padding: 6px 10px; background: #12193a;
-      }
-      .toggle input { appearance: none; width: 42px; height: 24px; background: #2b3354; border-radius: 999px; position: relative; outline: none; cursor: pointer; transition: background .2s ease; }
-      .toggle input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #e6e9ef; border-radius: 50%; transition: transform .2s ease; }
-      .toggle input:checked { background: #7b2cff; }
+      .toggle { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 999px; padding: 6px 10px; background: rgba(0,0,0,.04); }
+      .toggle input { appearance: none; width: 42px; height: 24px; background: rgba(0,0,0,.25); border-radius: 999px; position: relative; outline: none; cursor: pointer; transition: background .2s ease; }
+      .toggle input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: var(--text); border-radius: 50%; transition: transform .2s ease; }
+      .toggle input:checked { background: var(--accent); }
       .toggle input:checked::after { transform: translateX(18px); }
-      .btn { appearance: none; border: 1px solid #3a4064; background: #1a2146; color: #e6e9ef; padding: 10px 14px; border-radius: 10px; cursor: pointer; font-weight: 600; }
-      .btn:hover { background: #232a55; }
+      .btn { appearance: none; border: 1px solid var(--border); background: rgba(0,0,0,.06); color: var(--text); padding: 10px 14px; border-radius: 10px; cursor: pointer; font-weight: 600; }
+      .btn:hover { background: rgba(0,0,0,.10); }
       .status { font-size: 12px; opacity: .8; }
-      .widget-wrap { margin-top: 14px; border: 1px dashed #2a2f45; border-radius: 12px; padding: 12px; display: grid; place-items: center; min-height: 120px; }
+      .orb-scene { margin-top: 14px; border: 1px dashed var(--border); border-radius: 12px; padding: 24px; display: grid; place-items: center; min-height: 180px; background: rgba(0,0,0,.04); }
+      .orb { width: 160px; height: 160px; border-radius: 50%; position: relative; background: radial-gradient( circle at 35% 35%, var(--orb-highlight), var(--orb-base) 60% ); box-shadow: 0 0 40px var(--orb-glow), inset 0 0 20px rgba(255,255,255,.06); }
+      .orb::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.18), transparent 45%); animation: breathe 4s ease-in-out infinite; }
+      .ring { position: absolute; left: 50%; top: 50%; width: 140px; height: 140px; margin-left: -70px; margin-top: -70px; border-radius: 50%; box-shadow: 0 0 0 1px var(--orb-wave) inset; animation: ripple 3s linear infinite; }
+      .ring:nth-child(1) { animation-delay: 0s; }
+      .ring:nth-child(2) { animation-delay: 1s; }
+      .ring:nth-child(3) { animation-delay: 2s; }
+      @keyframes ripple { 0% { transform: scale(1); opacity: .6; } 70% { opacity: .18; } 100% { transform: scale(2.3); opacity: 0; } }
+      @keyframes breathe { 0%,100% { transform: scale(0.98); } 50% { transform: scale(1.02); } }
     </style>
   </head>
   <body>
@@ -40,7 +86,13 @@
         <span id="status" class="status"></span>
       </div>
 
-      <div id="log" class="widget-wrap"></div>
+      <div class="orb-scene" aria-hidden="true">
+        <div class="orb">
+          <span class="ring"></span>
+          <span class="ring"></span>
+          <span class="ring"></span>
+        </div>
+      </div>
     </main>
 
     <script type="module">
@@ -98,20 +150,11 @@
       const startBtn = document.getElementById('startBtn');
       const modeToggle = document.getElementById('modeToggle');
       const statusEl = document.getElementById('status');
-      const logEl = document.getElementById('log');
-
-      // Improve transcript container scrolling
-      logEl.style.overflow = 'auto';
-      logEl.style.maxHeight = '240px';
 
       function setStatus(text) { statusEl.textContent = text; }
-      function appendLog(text) {
-        const item = document.createElement('div');
-        item.textContent = text;
-        item.style.fontSize = '12px';
-        item.style.opacity = '0.9';
-        logEl.appendChild(item);
-        logEl.scrollTop = logEl.scrollHeight;
+      function applyMode() {
+        document.body.classList.toggle('mode-unrestricted', modeToggle.checked);
+        document.body.classList.toggle('mode-normal', !modeToggle.checked);
       }
 
       async function ensureMicPermission() {
@@ -136,13 +179,9 @@
         vapi.on('call-end', () => {
           setStatus('Chamada encerrada.');
         });
-        vapi.on('message', (message) => {
-          if (message && message.type === 'transcript' && message.transcript) {
-            appendLog(`${message.role}: ${message.transcript}`);
-          }
-        });
+        // Transcript handling removido para uma interface mais clean
         vapi.on('error', (err) => {
-          appendLog(`erro: ${err?.message || String(err)}`);
+          console.error(err);
           setStatus('Erro na chamada.');
         });
         return vapi;
@@ -168,7 +207,6 @@
           return;
         }
         setStatus('Conectando...');
-        logEl.innerHTML = '';
         try {
           startBtn.disabled = true;
           await vapi.start(getAssistantId());
@@ -190,12 +228,14 @@
       }
 
       modeToggle.addEventListener('change', () => {
+        applyMode();
         setStatus(modeToggle.checked ? 'Modo: Irrestrito' : 'Modo: Normal');
       });
 
       startBtn.addEventListener('click', startConversation);
 
       // Estado inicial
+      applyMode();
       setStatus('Modo: Normal');
     </script>
   </body>
