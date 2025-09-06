@@ -40,9 +40,7 @@
         <span id="status" class="status"></span>
       </div>
 
-      <div class="widget-wrap">
-        <vapi-widget id="vapiWidget" assistant-id="b7146a9e-bae1-4245-87f7-e72b1335ac55" public-key="13eed109-a96b-434f-90b6-60d81c28663d"></vapi-widget>
-      </div>
+      <div id="widgetMount" class="widget-wrap"></div>
     </main>
 
     <script src="https://unpkg.com/@vapi-ai/client-sdk-react/dist/embed/widget.umd.js" async type="text/javascript"></script>
@@ -54,18 +52,25 @@
       const startBtn = document.getElementById('startBtn');
       const modeToggle = document.getElementById('modeToggle');
       const statusEl = document.getElementById('status');
-      const widget = document.getElementById('vapiWidget');
+      const widgetMount = document.getElementById('widgetMount');
 
       function setStatus(text) { statusEl.textContent = text; }
 
-      function applyMode(isUnrestricted) {
+      function mountWidget(isUnrestricted) {
         const assistantId = isUnrestricted ? UNRESTRICTED_ASSISTANT_ID : NORMAL_ASSISTANT_ID;
-        widget.setAttribute('assistant-id', assistantId);
-        widget.setAttribute('public-key', PUBLIC_KEY);
+        // Remove any existing widget to force a clean re-mount
+        widgetMount.innerHTML = '';
+        const el = document.createElement('vapi-widget');
+        el.id = 'vapiWidget';
+        el.setAttribute('assistant-id', assistantId);
+        el.setAttribute('public-key', PUBLIC_KEY);
+        // If the widget supports additional props to limit UI to voice-only,
+        // they can be set here via attributes as needed in the future.
+        widgetMount.appendChild(el);
       }
 
       modeToggle.addEventListener('change', () => {
-        applyMode(modeToggle.checked);
+        mountWidget(modeToggle.checked);
       });
 
       async function ensureMicPermission() {
@@ -101,8 +106,8 @@
 
       startBtn.addEventListener('click', startConversation);
 
-      // Estado inicial
-      applyMode(false);
+      // Estado inicial: monta o widget no modo Normal
+      mountWidget(false);
     </script>
   </body>
   </html>
