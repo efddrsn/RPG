@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Delfos - Demo de Voz</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #0b1020; color: #e6e9ef; }
+      .card { width: min(720px, 92vw); border: 1px solid #2a2f45; border-radius: 12px; padding: 20px; background: #0f152b; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+      .title { margin: 0 0 6px; font-size: 20px; font-weight: 600; letter-spacing: .2px; }
+      .subtitle { margin: 0 0 16px; font-size: 13px; opacity: .8; }
+      .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .spacer { height: 10px; }
+      .toggle {
+        display: inline-flex; align-items: center; gap: 8px; border: 1px solid #313857; border-radius: 999px; padding: 6px 10px; background: #12193a;
+      }
+      .toggle input { appearance: none; width: 42px; height: 24px; background: #2b3354; border-radius: 999px; position: relative; outline: none; cursor: pointer; transition: background .2s ease; }
+      .toggle input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #e6e9ef; border-radius: 50%; transition: transform .2s ease; }
+      .toggle input:checked { background: #7b2cff; }
+      .toggle input:checked::after { transform: translateX(18px); }
+      .btn { appearance: none; border: 1px solid #3a4064; background: #1a2146; color: #e6e9ef; padding: 10px 14px; border-radius: 10px; cursor: pointer; font-weight: 600; }
+      .btn:hover { background: #232a55; }
+      .status { font-size: 12px; opacity: .8; }
+      .widget-wrap { margin-top: 14px; border: 1px dashed #2a2f45; border-radius: 12px; padding: 12px; display: grid; place-items: center; min-height: 120px; }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1 class="title">Delfos — Demo de Voz</h1>
+      <p class="subtitle">Use o botão para autorizar o microfone e o toggle para alternar entre modo normal e irrestrito. A conversa é contínua após iniciar.</p>
+
+      <div class="row">
+        <label class="toggle" title="Alternar modo irrestrito">
+          <span>Normal</span>
+          <input id="modeToggle" type="checkbox" />
+          <span>Irrestrito</span>
+        </label>
+        <button id="startBtn" class="btn">Iniciar conversa</button>
+        <span id="status" class="status"></span>
+      </div>
+
+      <div class="widget-wrap">
+        <vapi-widget id="vapiWidget" assistant-id="b7146a9e-bae1-4245-87f7-e72b1335ac55" public-key="13eed109-a96b-434f-90b6-60d81c28663d"></vapi-widget>
+      </div>
+    </main>
+
+    <script src="https://unpkg.com/@vapi-ai/client-sdk-react/dist/embed/widget.umd.js" async type="text/javascript"></script>
+    <script>
+      const NORMAL_ASSISTANT_ID = 'b7146a9e-bae1-4245-87f7-e72b1335ac55';
+      const UNRESTRICTED_ASSISTANT_ID = 'aa7f1b14-8dbc-4a59-9f5e-16079eae4da7';
+      const PUBLIC_KEY = '13eed109-a96b-434f-90b6-60d81c28663d';
+
+      const startBtn = document.getElementById('startBtn');
+      const modeToggle = document.getElementById('modeToggle');
+      const statusEl = document.getElementById('status');
+      const widget = document.getElementById('vapiWidget');
+
+      function setStatus(text) { statusEl.textContent = text; }
+
+      function applyMode(isUnrestricted) {
+        const assistantId = isUnrestricted ? UNRESTRICTED_ASSISTANT_ID : NORMAL_ASSISTANT_ID;
+        widget.setAttribute('assistant-id', assistantId);
+        widget.setAttribute('public-key', PUBLIC_KEY);
+      }
+
+      modeToggle.addEventListener('change', () => {
+        applyMode(modeToggle.checked);
+      });
+
+      async function ensureMicPermission() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(t => t.stop());
+          return true;
+        } catch (err) {
+          console.error('Mic permission error:', err);
+          return false;
+        }
+      }
+
+      async function startConversation() {
+        setStatus('Soliciando acesso ao microfone...');
+        const granted = await ensureMicPermission();
+        if (!granted) {
+          setStatus('Permissão do microfone negada. Autorize para continuar.');
+          return;
+        }
+        setStatus('Pronto. Você pode falar com a Delfos.');
+
+        // Tocar um beep curto para o usuário perceber que está pronto (opcional)
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.value = 880; gain.gain.value = 0.02;
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(); setTimeout(() => { osc.stop(); ctx.close(); }, 120);
+        } catch {}
+      }
+
+      startBtn.addEventListener('click', startConversation);
+
+      // Estado inicial
+      applyMode(false);
+    </script>
+  </body>
+  </html>
+
