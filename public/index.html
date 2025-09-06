@@ -44,24 +44,51 @@
     </main>
 
     <script type="module">
-      // Carrega o SDK da Vapi com fallback: ESM primeiro, depois UMD global
+      // Carrega o SDK da Vapi priorizando UMD (mais compatível), com fallbacks
       let VapiCtor = null;
       async function loadVapi() {
         if (VapiCtor) return VapiCtor;
-        try {
-          const mod = await import('https://cdn.jsdelivr.net/npm/@vapi-ai/web/+esm');
-          VapiCtor = mod?.default ?? mod?.Vapi ?? mod;
-        } catch (e) {
-          await new Promise((resolve, reject) => {
-            const s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/npm/@vapi-ai/web';
-            s.onload = resolve;
-            s.onerror = reject;
-            document.head.appendChild(s);
-          });
-          VapiCtor = window.Vapi;
+        // 1) Tenta UMD por diferentes CDNs
+        const umdUrls = [
+          'https://cdn.jsdelivr.net/npm/@vapi-ai/web/dist/index.umd.js',
+          'https://cdn.jsdelivr.net/npm/@vapi-ai/web',
+          'https://unpkg.com/@vapi-ai/web@latest/dist/index.umd.js'
+        ];
+        for (const url of umdUrls) {
+          try {
+            await new Promise((resolve, reject) => {
+              const s = document.createElement('script');
+              s.src = url;
+              s.async = true;
+              s.defer = true;
+              s.onload = resolve;
+              s.onerror = reject;
+              document.head.appendChild(s);
+            });
+            const candidate = (window.Vapi && (window.Vapi.default || window.Vapi)) || window.VapiWeb || window.VapiAI || window.vapi;
+            if (typeof candidate === 'function') {
+              VapiCtor = candidate;
+              return VapiCtor;
+            }
+          } catch {}
         }
-        return VapiCtor;
+        // 2) Fallback ESM
+        const esmUrls = [
+          'https://cdn.jsdelivr.net/npm/@vapi-ai/web/+esm',
+          'https://esm.sh/@vapi-ai/web',
+          'https://cdn.skypack.dev/@vapi-ai/web'
+        ];
+        for (const url of esmUrls) {
+          try {
+            const mod = await import(url);
+            const candidate = mod?.default ?? mod?.Vapi ?? mod?.VapiWeb ?? mod;
+            if (typeof candidate === 'function') {
+              VapiCtor = candidate;
+              return VapiCtor;
+            }
+          } catch {}
+        }
+        throw new Error('Não foi possível carregar o SDK da Vapi a partir das CDNs conhecidas.');
       }
 
       const NORMAL_ASSISTANT_ID = 'b7146a9e-bae1-4245-87f7-e72b1335ac55';
