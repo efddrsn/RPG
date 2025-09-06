@@ -64,6 +64,7 @@
         el.id = 'vapiWidget';
         el.setAttribute('assistant-id', assistantId);
         el.setAttribute('public-key', PUBLIC_KEY);
+        el.setAttribute('mode', 'voice');
         // If the widget supports additional props to limit UI to voice-only,
         // they can be set here via attributes as needed in the future.
         widgetMount.appendChild(el);
