@@ -44,7 +44,25 @@
     </main>
 
     <script type="module">
-      import Vapi from 'https://cdn.jsdelivr.net/npm/@vapi-ai/web/+esm';
+      // Carrega o SDK da Vapi com fallback: ESM primeiro, depois UMD global
+      let VapiCtor = null;
+      async function loadVapi() {
+        if (VapiCtor) return VapiCtor;
+        try {
+          const mod = await import('https://cdn.jsdelivr.net/npm/@vapi-ai/web/+esm');
+          VapiCtor = mod?.default ?? mod?.Vapi ?? mod;
+        } catch (e) {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/@vapi-ai/web';
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+          });
+          VapiCtor = window.Vapi;
+        }
+        return VapiCtor;
+      }
 
       const NORMAL_ASSISTANT_ID = 'b7146a9e-bae1-4245-87f7-e72b1335ac55';
       const UNRESTRICTED_ASSISTANT_ID = 'aa7f1b14-8dbc-4a59-9f5e-16079eae4da7';
@@ -80,21 +98,28 @@
         }
       }
 
-      const vapi = new Vapi(PUBLIC_KEY);
-
-      vapi.on('call-start', () => {
-        setStatus('Chamada iniciada. Fale com a Delfos.');
-      });
-
-      vapi.on('call-end', () => {
-        setStatus('Chamada encerrada.');
-      });
-
-      vapi.on('message', (message) => {
-        if (message && message.type === 'transcript' && message.transcript) {
-          appendLog(`${message.role}: ${message.transcript}`);
-        }
-      });
+      let vapi = null;
+      async function ensureVapi() {
+        if (vapi) return vapi;
+        const VapiClass = await loadVapi();
+        vapi = new VapiClass(PUBLIC_KEY);
+        vapi.on('call-start', () => {
+          setStatus('Chamada iniciada. Fale com a Delfos.');
+        });
+        vapi.on('call-end', () => {
+          setStatus('Chamada encerrada.');
+        });
+        vapi.on('message', (message) => {
+          if (message && message.type === 'transcript' && message.transcript) {
+            appendLog(`${message.role}: ${message.transcript}`);
+          }
+        });
+        vapi.on('error', (err) => {
+          appendLog(`erro: ${err?.message || String(err)}`);
+          setStatus('Erro na chamada.');
+        });
+        return vapi;
+      }
 
       function getAssistantId() {
         return modeToggle.checked ? UNRESTRICTED_ASSISTANT_ID : NORMAL_ASSISTANT_ID;
@@ -107,9 +132,18 @@
           setStatus('Permissão do microfone negada. Autorize para continuar.');
           return;
         }
+        setStatus('Carregando Vapi...');
+        try {
+          await ensureVapi();
+        } catch (e) {
+          console.error(e);
+          setStatus('Falha ao carregar o SDK da Vapi.');
+          return;
+        }
         setStatus('Conectando...');
         logEl.innerHTML = '';
         try {
+          startBtn.disabled = true;
           await vapi.start(getAssistantId());
           // Beep curto para indicar pronto
           try {
@@ -123,6 +157,8 @@
         } catch (err) {
           console.error(err);
           setStatus('Falha ao iniciar a chamada.');
+        } finally {
+          startBtn.disabled = false;
         }
       }
 
