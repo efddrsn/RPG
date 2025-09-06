@@ -40,11 +40,12 @@
         <span id="status" class="status"></span>
       </div>
 
-      <div id="widgetMount" class="widget-wrap"></div>
+      <div id="log" class="widget-wrap"></div>
     </main>
 
-    <script src="https://unpkg.com/@vapi-ai/client-sdk-react/dist/embed/widget.umd.js" async type="text/javascript"></script>
-    <script>
+    <script type="module">
+      import Vapi from 'https://cdn.jsdelivr.net/npm/@vapi-ai/web/+esm';
+
       const NORMAL_ASSISTANT_ID = 'b7146a9e-bae1-4245-87f7-e72b1335ac55';
       const UNRESTRICTED_ASSISTANT_ID = 'aa7f1b14-8dbc-4a59-9f5e-16079eae4da7';
       const PUBLIC_KEY = '13eed109-a96b-434f-90b6-60d81c28663d';
@@ -52,32 +53,26 @@
       const startBtn = document.getElementById('startBtn');
       const modeToggle = document.getElementById('modeToggle');
       const statusEl = document.getElementById('status');
-      const widgetMount = document.getElementById('widgetMount');
+      const logEl = document.getElementById('log');
+
+      // Improve transcript container scrolling
+      logEl.style.overflow = 'auto';
+      logEl.style.maxHeight = '240px';
 
       function setStatus(text) { statusEl.textContent = text; }
-
-      function mountWidget(isUnrestricted) {
-        const assistantId = isUnrestricted ? UNRESTRICTED_ASSISTANT_ID : NORMAL_ASSISTANT_ID;
-        // Remove any existing widget to force a clean re-mount
-        widgetMount.innerHTML = '';
-        const el = document.createElement('vapi-widget');
-        el.id = 'vapiWidget';
-        el.setAttribute('assistant-id', assistantId);
-        el.setAttribute('public-key', PUBLIC_KEY);
-        el.setAttribute('mode', 'voice');
-        // If the widget supports additional props to limit UI to voice-only,
-        // they can be set here via attributes as needed in the future.
-        widgetMount.appendChild(el);
+      function appendLog(text) {
+        const item = document.createElement('div');
+        item.textContent = text;
+        item.style.fontSize = '12px';
+        item.style.opacity = '0.9';
+        logEl.appendChild(item);
+        logEl.scrollTop = logEl.scrollHeight;
       }
-
-      modeToggle.addEventListener('change', () => {
-        mountWidget(modeToggle.checked);
-      });
 
       async function ensureMicPermission() {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          stream.getTracks().forEach(t => t.stop());
+          stream.getTracks().forEach(track => track.stop());
           return true;
         } catch (err) {
           console.error('Mic permission error:', err);
@@ -85,30 +80,60 @@
         }
       }
 
+      const vapi = new Vapi(PUBLIC_KEY);
+
+      vapi.on('call-start', () => {
+        setStatus('Chamada iniciada. Fale com a Delfos.');
+      });
+
+      vapi.on('call-end', () => {
+        setStatus('Chamada encerrada.');
+      });
+
+      vapi.on('message', (message) => {
+        if (message && message.type === 'transcript' && message.transcript) {
+          appendLog(`${message.role}: ${message.transcript}`);
+        }
+      });
+
+      function getAssistantId() {
+        return modeToggle.checked ? UNRESTRICTED_ASSISTANT_ID : NORMAL_ASSISTANT_ID;
+      }
+
       async function startConversation() {
-        setStatus('Soliciando acesso ao microfone...');
+        setStatus('Solicitando acesso ao microfone...');
         const granted = await ensureMicPermission();
         if (!granted) {
           setStatus('Permissão do microfone negada. Autorize para continuar.');
           return;
         }
-        setStatus('Pronto. Você pode falar com a Delfos.');
-
-        // Tocar um beep curto para o usuário perceber que está pronto (opcional)
+        setStatus('Conectando...');
+        logEl.innerHTML = '';
         try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.frequency.value = 880; gain.gain.value = 0.02;
-          osc.connect(gain).connect(ctx.destination);
-          osc.start(); setTimeout(() => { osc.stop(); ctx.close(); }, 120);
-        } catch {}
+          await vapi.start(getAssistantId());
+          // Beep curto para indicar pronto
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.value = 880; gain.gain.value = 0.02;
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(); setTimeout(() => { osc.stop(); ctx.close(); }, 120);
+          } catch {}
+        } catch (err) {
+          console.error(err);
+          setStatus('Falha ao iniciar a chamada.');
+        }
       }
+
+      modeToggle.addEventListener('change', () => {
+        setStatus(modeToggle.checked ? 'Modo: Irrestrito' : 'Modo: Normal');
+      });
 
       startBtn.addEventListener('click', startConversation);
 
-      // Estado inicial: monta o widget no modo Normal
-      mountWidget(false);
+      // Estado inicial
+      setStatus('Modo: Normal');
     </script>
   </body>
   </html>
